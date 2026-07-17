@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import DeckGL from '@deck.gl/react'
-import { FlyToInterpolator, PathLayer, ScatterplotLayer, TextLayer, GeoJsonLayer, Tile3DLayer, TileLayer, BitmapLayer, TerrainLayer, TripsLayer, ScenegraphLayer, ColumnLayer } from 'deck.gl'
+import { FlyToInterpolator, PathLayer, ScatterplotLayer, TextLayer, GeoJsonLayer, Tile3DLayer, TileLayer, BitmapLayer, TerrainLayer, TripsLayer, ScenegraphLayer, ColumnLayer, SolidPolygonLayer } from 'deck.gl'
 import { Map as MapLibreMap } from 'react-map-gl/maplibre'
 import { Map as MapboxMap } from 'react-map-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
@@ -129,6 +129,67 @@ export default function GeospatialMap({ onEnterMicro, presenting = false }) {
   const ms = getMapState() // fresh every frame (component re-renders on the time tick)
   const lastZoomRef = useRef(99) // 99 → must zoom OUT below the threshold before auto-trigger can arm
   const [poiData, setPoiData] = useState({})
+  const [flights, setFlights] = useState([])
+
+  // ── Live flight telemetry: OpenSky Network poll (viewport-bounded) ──
+  useEffect(() => {
+    let id = null
+    let cancelled = false
+    const poll = async () => {
+      const s = getMapState()
+      if (!s.civic.flights) return
+      const c = CITIES[s.cityId] || CITIES.bengaluru
+      const url =
+        `https://opensky-network.org/api/states/all` +
+        `?lamin=${(c.lat - 0.7).toFixed(3)}&lomin=${(c.lng - 0.7).toFixed(3)}` +
+        `&lamax=${(c.lat + 0.7).toFixed(3)}&lomax=${(c.lng + 0.7).toFixed(3)}`
+      try {
+        const ctrl = new AbortController()
+        const t = setTimeout(() => ctrl.abort(), 12000)
+        const json = await fetch(url, { signal: ctrl.signal }).then((r) => {
+          clearTimeout(t)
+          if (!r.ok) throw new Error(`opensky http ${r.status}`)
+          return r.json()
+        })
+        if (cancelled) return
+        const states = Array.isArray(json && json.states) ? json.states : []
+        setFlights(
+          states
+            .filter((a) => Number.isFinite(a[5]) && Number.isFinite(a[6]) && !a[8])
+            .slice(0, 60)
+            .map((a) => ({
+              callsign: (a[1] || '').trim() || a[0],
+              lng: a[5],
+              lat: a[6],
+              alt: Number.isFinite(a[7]) ? a[7] : 1000,
+              track: Number.isFinite(a[10]) ? a[10] : 0,
+            }))
+        )
+      } catch (e) {
+        // anonymous OpenSky rate-limits aggressively — keep last known aircraft
+        console.warn('[Flights] OpenSky poll failed —', e && e.message)
+      }
+    }
+    const start = () => {
+      poll()
+      id = setInterval(poll, 15000)
+    }
+    start()
+    const unsub = subscribeMapState(() => {
+      const on = getMapState().civic.flights
+      if (on && id === null) start()
+      if (!on && id !== null) {
+        clearInterval(id)
+        id = null
+        setFlights([])
+      }
+    })
+    return () => {
+      cancelled = true
+      if (id !== null) clearInterval(id)
+      unsub()
+    }
+  }, [])
   const [modelOk, setModelOk] = useState({})
   const poiTimer = useRef(null)
   const lastCityRef = useRef(getMapState().cityId)
@@ -240,7 +301,7 @@ export default function GeospatialMap({ onEnterMicro, presenting = false }) {
   useEffect(() => {
     let raf
     const loop = () => {
-      setTime((t) => (t + 1.4) % LOOP)
+      setTime((t) => (t + 1.4 * (getMapState().civic.transitSpeed || 1)) % LOOP)
       raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)
@@ -316,6 +377,11 @@ export default function GeospatialMap({ onEnterMicro, presenting = false }) {
         new Tile3DLayer({
           id: 'google-3d-tiles',
           data: GOOGLE_3D_TILES_URL,
+          // LOD & memory management: coarser refinement target + request
+          // throttling keeps texture streaming inside a 60fps frame budget
+          loadOptions: {
+            tileset: { throttleRequests: true, maxRequests: 12, maximumScreenSpaceError: 18 },
+          },
           onTilesetLoad: () => emitSimEvent('tilesLoaded'), // releases the loading screen
           onTileError: () => {}, // a failed tile must never break the scene
         }),
@@ -428,8 +494,8 @@ export default function GeospatialMap({ onEnterMicro, presenting = false }) {
         capRounded: true,
         jointRounded: true,
       }),
-      // animated emissive traffic pulses
-      new TripsLayer({
+      // animated emissive traffic pulses (timestamped trips · speed-multiplied)
+      ms.civic.transit && new TripsLayer({
         id: 'arterial-trips',
         data: TRIPS,
         getPath: (d) => d.path,
@@ -511,6 +577,59 @@ export default function GeospatialMap({ onEnterMicro, presenting = false }) {
         backgroundPadding: [6, 3],
         updateTriggers: { getText: ms.cityId, getColor: ms.cityId },
       }),
+      // ── LIVE FLIGHT TELEMETRY (OpenSky) ──
+      ms.civic.flights && flights.length > 0 &&
+        new TextLayer({
+          id: 'flights',
+          data: flights,
+          getPosition: (d) => [d.lng, d.lat, Math.min(d.alt, 12000)],
+          getText: () => '✈',
+          getSize: 26,
+          getAngle: (d) => 90 - d.track,
+          getColor: [230, 215, 178, 255],
+          outlineWidth: 2,
+          outlineColor: [8, 10, 14, 255],
+          fontFamily: 'sans-serif',
+        }),
+      ms.civic.flights && flights.length > 0 && lastView.current.zoom >= 9 &&
+        new TextLayer({
+          id: 'flight-callsigns',
+          data: flights,
+          getPosition: (d) => [d.lng, d.lat, Math.min(d.alt, 12000)],
+          getText: (d) => d.callsign,
+          getSize: 10,
+          getPixelOffset: [0, -20],
+          getColor: [159, 232, 184, 235],
+          fontFamily: 'Menlo, Consolas, monospace',
+          background: true,
+          getBackgroundColor: [8, 10, 14, 180],
+          backgroundPadding: [3, 2],
+        }),
+      // ── FLOOD RISK SIMULATOR: translucent water volume at slider height —
+      // the photorealistic mesh intersects it, so terrain and lower floors
+      // below the threshold read as inundated while towers rise clear ──
+      ms.civic.flood &&
+        new SolidPolygonLayer({
+          id: 'flood-water',
+          data: [
+            (() => {
+              const c = CITIES[ms.cityId] || CITIES.bengaluru
+              const d = 0.22
+              return {
+                polygon: [
+                  [c.lng - d, c.lat - d], [c.lng + d, c.lat - d],
+                  [c.lng + d, c.lat + d], [c.lng - d, c.lat + d],
+                ],
+              }
+            })(),
+          ],
+          getPolygon: (d) => d.polygon,
+          extruded: true,
+          getElevation: ms.civic.floodLevel,
+          getFillColor: [45, 120, 200, 110],
+          material: false,
+          updateTriggers: { getElevation: ms.civic.floodLevel },
+        }),
       // ── SEMANTIC POI FILTERS (viewport-restricted, clustered by cap) ──
       ms.poi.traffic && TOMTOM_KEY &&
         rasterOverlay('traffic', `https://api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?key=${TOMTOM_KEY}`),
@@ -566,7 +685,7 @@ export default function GeospatialMap({ onEnterMicro, presenting = false }) {
             }),
         ]),
     ],
-    [time, isoData, showIso, osmBuildings, openLand, poiData, modelOk]
+    [time, isoData, showIso, osmBuildings, openLand, poiData, modelOk, flights]
   )
 
   const handleMapClick = (info) => {

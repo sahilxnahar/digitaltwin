@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { CITIES } from '../cities.js'
 import { emitSimEvent } from '../state.js'
-import { useMapState, patchMapState, toggleOverlay, togglePoi } from '../mapStore.js'
+import { useMapState, patchMapState, toggleOverlay, togglePoi, patchCivic } from '../mapStore.js'
 import { POI_MIN_ZOOM } from '../services/PoiService.js'
 
 // Floating environmental & basemap control panel (City View).
@@ -78,6 +78,44 @@ export default function MapControls() {
           </div>
           {ms.overlays.streetview && (
             <div className="dim small">Street View armed — click anywhere on the map to open the panorama</div>
+          )}
+
+          <div className="dim small label">civic simulation</div>
+          <div className="map-row wrap">
+            <button className={ms.civic.transit ? 'on' : ''} onClick={() => patchCivic({ transit: !ms.civic.transit })}>
+              Transit Flow
+            </button>
+            {[1, 4, 10].map((s) => (
+              <button
+                key={s}
+                className={ms.civic.transitSpeed === s ? 'on' : ''}
+                onClick={() => patchCivic({ transitSpeed: s })}
+              >
+                {s}×
+              </button>
+            ))}
+            <button className={ms.civic.flights ? 'on' : ''} onClick={() => patchCivic({ flights: !ms.civic.flights })}>
+              ✈ Live Flights
+            </button>
+            <button className={ms.civic.flood ? 'on' : ''} onClick={() => patchCivic({ flood: !ms.civic.flood })}>
+              Flood Risk
+            </button>
+          </div>
+          {ms.civic.flood && (
+            <div className="flood-slider">
+              <span className="dim small">inundation {ms.civic.floodLevel.toFixed(2)} m</span>
+              <input
+                type="range"
+                min="0"
+                max="5"
+                step="0.25"
+                value={ms.civic.floodLevel}
+                onChange={(e) => patchCivic({ floodLevel: parseFloat(e.target.value) })}
+              />
+            </div>
+          )}
+          {ms.civic.flights && (
+            <div className="dim small">live aircraft via OpenSky Network (anonymous tier — updates ~15 s)</div>
           )}
 
           <div className="dim small label">property intelligence</div>

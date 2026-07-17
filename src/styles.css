@@ -455,3 +455,12 @@ button.on { background: #274b35; border-color: #5ad67d; color: #9fe8b8; }
 .map-row.wrap button { flex: 0 1 auto; }
 .map-col { display: flex; flex-direction: column; gap: 4px; }
 .map-col button { text-align: left; font-size: 10.5px; padding: 5px 9px; }
+
+
+/* flood risk slider */
+.flood-slider { display: flex; flex-direction: column; gap: 2px; margin: 2px 0 4px; }
+.flood-slider input[type='range'] {
+  width: 100%;
+  accent-color: #e6d7b2;
+  background: transparent;
+}

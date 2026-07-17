@@ -12,6 +12,7 @@ const state = {
   siteMode: 'stylized', // Site View geometry: 'stylized' | 'real' (live OSM)
   cityId: getActiveCityId(), // ACTIVE city for the streaming macro view (soft-switched)
   poi: { openland: false, construction: false, dining: false, hotels: false, luxury: false, traffic: false },
+  civic: { transit: true, transitSpeed: 1, flights: false, flood: false, floodLevel: 1.5 },
   filters: { floors: null, category: null }, // Site View real-estate filters
   hotspot: null, // active premium-corridor hotspot (from cities.js)
   _v: 0,
@@ -25,6 +26,12 @@ export function getMapState() {
 
 export function patchMapState(patch) {
   Object.assign(state, patch)
+  state._v++
+  listeners.forEach((fn) => fn())
+}
+
+export function patchCivic(patch) {
+  state.civic = { ...state.civic, ...patch }
   state._v++
   listeners.forEach((fn) => fn())
 }

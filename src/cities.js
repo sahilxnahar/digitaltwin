@@ -92,13 +92,16 @@ export const CITIES = {
     id: 'bengaluru',
     city: 'Bengaluru',
     placeName: 'Ameya Heights',
-    lat: 12.9914,
-    lng: 77.5393,
-    aerialAddress: 'Basaveshwar Nagar, Bengaluru, India',
+    // SITE: 1st Block, 494, 15th Main Rd, 3rd Stage, Basaveshwar Nagar, 560079
+    // ← for pinpoint accuracy: Google Maps → right-click your plot →
+    //   click the coordinates to copy → paste them here (lat, lng)
+    lat: 12.9871,
+    lng: 77.525,
+    aerialAddress: '494, 15th Main Rd, 3rd Stage, Basaveshwar Nagar, Bengaluru, Karnataka 560079',
     dataGovCity: 'Bengaluru',
     model: 'models/ameya_heights_bengaluru_v1.glb',
     sun: { rise: 6.1, set: 18.6 },
-    hint: 'zoom into Basaveshwar Nagar (z≥15) to enter the site',
+    hint: 'zoom into Basaveshwar Nagar 3rd Stage (z≥15) to enter the site',
     loadingSub: 'DIGITAL TWIN · BENGALURU · LUXURY RESIDENCES',
     macroView: { longitude: 77.62, latitude: 13.04, zoom: 10, pitch: 45, bearing: -12 },
     roadNamesX: { '-150': 'Kamakshipalya Main Road', '-40': '8th Main Road', '110': 'West of Chord Road' },
@@ -173,7 +176,7 @@ export function getActiveCityId() {
     const v = localStorage.getItem(STORAGE_KEY)
     if (v && CITIES[v]) return v
   } catch { /* storage unavailable → default */ }
-  return 'chennai'
+  return 'bengaluru' // the live project site is the default city
 }
 
 // Persist + full reload: every module re-derives its city constants and the

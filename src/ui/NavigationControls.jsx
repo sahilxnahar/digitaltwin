@@ -59,6 +59,7 @@ export default function NavigationControls({ viewMode, controlsRef }) {
       <button title="Zoom in" onClick={() => zoom(0.72)}>+</button>
       <button title="Zoom out" onClick={() => zoom(1.38)}>−</button>
       <button title="Reset view" className="nav-reset" onClick={reset}>⟲</button>
+      <button title="Pause rotation" className="nav-reset" onClick={() => emitSimEvent('pauseRotation')}>⏸</button>
     </div>
   )
 }

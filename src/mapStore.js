@@ -4,10 +4,10 @@ import { useEffect, useReducer } from 'react'
 // Same external-mutable pattern as simState: components subscribe via
 // useMapState(); Deck.gl reads getMapState() during its render loop.
 const state = {
-  timeOfDay: 'night', // macro basemap vision: 'day' | 'night'
+  timeOfDay: 'day', // default bright — 'day' | 'night' (synced with Site View)
   basemap: 'default', // 'default' | 'satellite' | 'terrain'
   show3dTiles: true, // Google photorealistic tiles on/off
-  overlays: { aqi: false, transit: false, cycling: false, fire: false, streetview: false },
+  overlays: { aqi: false, transit: false, cycling: false, fire: false, streetview: false, osmBuildings: false, openLand: false },
   filters: { floors: null, category: null }, // Site View real-estate filters
   hotspot: null, // active premium-corridor hotspot (from cities.js)
   _v: 0,

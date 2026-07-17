@@ -12,6 +12,8 @@ const OVERLAYS = [
   { id: 'cycling', label: 'Bicycling' },
   { id: 'fire', label: 'Wildfire Alerts' },
   { id: 'streetview', label: 'Street View · click map' },
+  { id: 'osmBuildings', label: 'Real Buildings · OSM' },
+  { id: 'openLand', label: 'Open Land Boundaries' },
 ]
 
 export default function MapControls() {

@@ -5,7 +5,8 @@ import { OrbitControls } from '@react-three/drei'
 import GeospatialMap from './scene/GeospatialMap.jsx'
 import EnvironmentController from './scene/Environment.jsx'
 import PresentationMode from './scene/PresentationMode.jsx'
-import { subscribePresentation } from './state.js'
+import { subscribePresentation, onSimEvent, emitSimEvent } from './state.js'
+import { getMapState, patchMapState, subscribeMapState } from './mapStore.js'
 import Lighting from './scene/Lighting.jsx'
 import Ground from './scene/Ground.jsx'
 import Buildings from './scene/Buildings.jsx'
@@ -23,6 +24,23 @@ import StreetLabels from './scene/StreetLabels.jsx'
 import LoadingScreen from './ui/LoadingScreen.jsx'
 import { useLiveData } from './hooks/useLiveData.js'
 import { simState } from './state.js'
+
+// ─── Zoom-out hand-off: pulling all the way back in Site View returns
+// to the city map, so zoom is seamless in BOTH directions ───
+function ZoomOutToCity({ controlsRef, onExit }) {
+  const armed = useRef(false)
+  useFrame(() => {
+    const c = controlsRef.current
+    if (!c) return
+    const d = c.object.position.distanceTo(c.target)
+    if (d < 380) armed.current = true // arm once the user is properly inside
+    if (armed.current && d >= 426 && !simState.tourMode && !simState.isPresentationActive) {
+      armed.current = false
+      onExit()
+    }
+  })
+  return null
+}
 
 // ─── Cinematic site tour: slow orbit around the proposed plot at
 // the Ameya Heights plot (−95, 40) — kept in sync with PLOT in Buildings.jsx ───
@@ -106,13 +124,44 @@ function useFadeLayer(show, ms = 650) {
 
 export default function App() {
   const [mode, setMode] = useState('day') // 'day' | 'night' | 'rain'
-  const [envAuto, setEnvAuto] = useState(true) // live environment drives mode
+  const [envAuto, setEnvAuto] = useState(false) // manual DAY by default — bright, roads clearly visible (enable Auto for real-time sun)
   const [sunPos, setSunPos] = useState(null) // real Chennai sun position
   // Manual override: forces a mode and detaches the live-environment driver
   const forceMode = (m) => {
     setEnvAuto(false)
     setMode(m)
   }
+
+  // ── Unified day/night: Site View mode ⇄ City View basemap vision ──
+  const lastTod = useRef(null)
+  useEffect(() => {
+    const target = mode === 'night' ? 'night' : 'day'
+    lastTod.current = target
+    if (getMapState().timeOfDay !== target) patchMapState({ timeOfDay: target })
+  }, [mode])
+  useEffect(
+    () =>
+      subscribeMapState(() => {
+        const tod = getMapState().timeOfDay
+        if (tod === lastTod.current) return
+        lastTod.current = tod
+        setEnvAuto(false)
+        setMode((m) => (m === tod ? m : tod === 'night' ? 'night' : 'day'))
+      }),
+    []
+  )
+
+  // ── Pause rotation (nav ⏸): stops cinematic orbit + site tour ──
+  useEffect(
+    () =>
+      onSimEvent((type) => {
+        if (type !== 'pauseRotation') return
+        setCinematic(false)
+        simState.tourMode = false
+        emitSimEvent('simChanged')
+      }),
+    []
+  )
   const [simSpeed, setSimSpeed] = useState(1)
   const [cinematic, setCinematic] = useState(false)
   const [liveEnabled, setLiveEnabled] = useState(true)
@@ -190,6 +239,7 @@ export default function App() {
               maxPolarAngle={Math.PI / 2 - 0.1} // camera can never clip below ground
             />
             <CameraTour controlsRef={controlsRef} />
+            <ZoomOutToCity controlsRef={controlsRef} onExit={() => setViewMode('macro')} />
             {/* <Effects mode={mode} /> — post-processing stripped: raw renderer output */}
           </Canvas>
         </div>

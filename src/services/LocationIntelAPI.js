@@ -22,19 +22,11 @@ async function withTimeout(promiseFactory, ms) {
   }
 }
 
-// Live OSM amenity snapshot within ~1.5 km of Ameya Heights
-export async function fetchAmenitySnapshot() {
-  const q = `[out:json][timeout:20];(
-    node["amenity"~"^(school|college|hospital|clinic|pharmacy|restaurant|cafe|bank|atm)$"](around:1500,${PLACE_LAT},${PLACE_LNG});
-    way["amenity"~"^(school|college|hospital|clinic|restaurant|cafe)$"](around:1500,${PLACE_LAT},${PLACE_LNG});
-    node["railway"="station"](around:2500,${PLACE_LAT},${PLACE_LNG});
-    node["highway"="bus_stop"](around:1000,${PLACE_LAT},${PLACE_LNG});
-    way["leisure"="park"](around:1500,${PLACE_LAT},${PLACE_LNG});
-  );out tags 800;`
-  let json = null
+// Shared Overpass POST with public-instance failover
+async function overpassQuery(q) {
   for (const url of OVERPASS_URLS) {
     try {
-      json = await withTimeout(
+      return await withTimeout(
         (signal) =>
           fetch(url, {
             method: 'POST',
@@ -47,12 +39,64 @@ export async function fetchAmenitySnapshot() {
           }),
         15000
       )
-      break
     } catch {
-      json = null // try the next public instance
+      /* try the next public instance */
     }
   }
-  if (!json) throw new Error('all overpass instances unavailable')
+  throw new Error('all overpass instances unavailable')
+}
+
+function waysToGeoJson(json, propsFor) {
+  const feats = []
+  for (const el of json.elements || []) {
+    if (!el.geometry || el.geometry.length < 3) continue
+    feats.push({
+      type: 'Feature',
+      properties: propsFor(el.tags || {}),
+      geometry: { type: 'Polygon', coordinates: [el.geometry.map((p) => [p.lon, p.lat])] },
+    })
+  }
+  return { type: 'FeatureCollection', features: feats }
+}
+
+// REAL building footprints around the site (live OpenStreetMap data),
+// extruded in the city view — heights from building:levels where mapped
+export async function fetchOsmBuildings() {
+  const q = `[out:json][timeout:25];(way["building"](around:600,${PLACE_LAT},${PLACE_LNG}););out geom 1200;`
+  const gj = waysToGeoJson(await overpassQuery(q), (t) => {
+    const levels = parseFloat(t['building:levels'])
+    return {
+      height: parseFloat(t.height) || (Number.isFinite(levels) ? levels * 3.2 : 6),
+      name: t.name || null,
+      kind: t.building || 'yes',
+    }
+  })
+  if (!gj.features.length) throw new Error('no OSM buildings returned')
+  return gj
+}
+
+// Open land parcels (greenfield/brownfield/vacant/parks) — boundary marking
+export async function fetchOpenLand() {
+  const q =
+    `[out:json][timeout:25];(` +
+    `way["landuse"~"^(greenfield|brownfield|construction|vacant|grass|meadow|recreation_ground|village_green)$"](around:900,${PLACE_LAT},${PLACE_LNG});` +
+    `way["leisure"="park"](around:900,${PLACE_LAT},${PLACE_LNG});` +
+    `);out geom 400;`
+  const gj = waysToGeoJson(await overpassQuery(q), (t) => ({ kind: t.landuse || t.leisure || 'open' }))
+  if (!gj.features.length) throw new Error('no open-land parcels returned')
+  return gj
+}
+
+// Live OSM amenity snapshot within ~1.5 km of Ameya Heights
+export async function fetchAmenitySnapshot() {
+  const q = `[out:json][timeout:20];(
+    node["amenity"~"^(school|college|hospital|clinic|pharmacy|restaurant|cafe|bank|atm)$"](around:1500,${PLACE_LAT},${PLACE_LNG});
+    way["amenity"~"^(school|college|hospital|clinic|restaurant|cafe)$"](around:1500,${PLACE_LAT},${PLACE_LNG});
+    node["railway"="station"](around:2500,${PLACE_LAT},${PLACE_LNG});
+    node["highway"="bus_stop"](around:1000,${PLACE_LAT},${PLACE_LNG});
+    way["leisure"="park"](around:1500,${PLACE_LAT},${PLACE_LNG});
+  );out tags 800;`
+  const json = await overpassQuery(q)
   const els = Array.isArray(json && json.elements) ? json.elements : []
   const counts = { transit: 0, dining: 0, education: 0, healthcare: 0, parks: 0, banking: 0 }
   for (const el of els) {

@@ -8,7 +8,8 @@ import 'mapbox-gl/dist/mapbox-gl.css'
 import { CITY_CFG, PLACE_LAT, PLACE_LNG, PLACE_NAME } from '../config.js'
 import { onSimEvent, emitSimEvent, simState } from '../state.js'
 import { fetchIsochrones } from '../services/LocationIntelAPI.js'
-import { getMapState } from '../mapStore.js'
+import { getMapState, subscribeMapState } from '../mapStore.js'
+import { fetchOsmBuildings, fetchOpenLand } from '../services/LocationIntelAPI.js'
 
 // ─── Google Maps Photorealistic 3D Tiles ───
 // Requires "Map Tiles API" enabled on the key. While no key is present the
@@ -108,6 +109,31 @@ export default function GeospatialMap({ onEnterMicro, presenting = false }) {
   const [time, setTime] = useState(0)
   const lastView = useRef(INITIAL_VIEW_STATE) // latest camera pose (uncontrolled)
   const ms = getMapState() // fresh every frame (component re-renders on the time tick)
+  const lastZoomRef = useRef(99) // 99 → must zoom OUT below the threshold before auto-trigger can arm
+  const [osmBuildings, setOsmBuildings] = useState(null)
+  const [openLand, setOpenLand] = useState(null)
+  const fetching = useRef({})
+
+  // lazily fetch real OSM data the first time each overlay is enabled
+  useEffect(
+    () =>
+      subscribeMapState(() => {
+        const s = getMapState()
+        if (s.overlays.osmBuildings && !fetching.current.b) {
+          fetching.current.b = true
+          fetchOsmBuildings()
+            .then(setOsmBuildings)
+            .catch((e) => console.warn('[OSM buildings] unavailable —', e && e.message))
+        }
+        if (s.overlays.openLand && !fetching.current.l) {
+          fetching.current.l = true
+          fetchOpenLand()
+            .then(setOpenLand)
+            .catch((e) => console.warn('[Open land] unavailable —', e && e.message))
+        }
+      }),
+    []
+  )
   const tilesActive = HAS_GOOGLE_KEY && ms.show3dTiles && ms.basemap === 'default'
   const [isoData, setIsoData] = useState(null)
   const [showIso, setShowIso] = useState(false)
@@ -202,8 +228,13 @@ export default function GeospatialMap({ onEnterMicro, presenting = false }) {
   const handleViewState = useCallback(
     ({ viewState: vs }) => {
       lastView.current = vs
+      // EDGE-triggered hand-off: fires only when zoom CROSSES the threshold
+      // upward, so returning from Site View never re-traps the camera and
+      // zooming back out always works.
+      const crossed = lastZoomRef.current < MICRO_TRIGGER.zoom && vs.zoom >= MICRO_TRIGGER.zoom
+      lastZoomRef.current = vs.zoom
       if (
-        vs.zoom >= MICRO_TRIGGER.zoom &&
+        crossed &&
         Math.abs(vs.latitude - PLACE_LAT) < MICRO_TRIGGER.dLat &&
         Math.abs(vs.longitude - PLACE_LNG) < MICRO_TRIGGER.dLng
       ) {
@@ -229,6 +260,29 @@ export default function GeospatialMap({ onEnterMicro, presenting = false }) {
         .map((k) => {
           const url = OVERLAY_TILES[k]()
           return url ? rasterOverlay(k, url) : null
+        }),
+      // REAL OSM building footprints (live data), extruded in 3D
+      ms.overlays.osmBuildings && osmBuildings &&
+        new GeoJsonLayer({
+          id: 'osm-buildings',
+          data: osmBuildings,
+          extruded: true,
+          getElevation: (f) => f.properties.height,
+          getFillColor: [186, 196, 208, 235],
+          getLineColor: [30, 34, 40, 255],
+          stroked: true,
+          lineWidthMinPixels: 0.6,
+        }),
+      // open-land parcel boundaries (champagne outline, faint green fill)
+      ms.overlays.openLand && openLand &&
+        new GeoJsonLayer({
+          id: 'open-land',
+          data: openLand,
+          stroked: true,
+          filled: true,
+          getFillColor: [90, 214, 125, 18],
+          getLineColor: [230, 215, 178, 220],
+          lineWidthMinPixels: 2.5,
         }),
       // premium corridor hotspot: champagne ring + luxury POI highlights
       ms.hotspot &&
@@ -353,7 +407,7 @@ export default function GeospatialMap({ onEnterMicro, presenting = false }) {
         backgroundPadding: [6, 3],
       }),
     ],
-    [time, isoData, showIso]
+    [time, isoData, showIso, osmBuildings, openLand]
   )
 
   const handleMapClick = (info) => {

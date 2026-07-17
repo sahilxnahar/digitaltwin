@@ -1,3 +1,1 @@
-Place the architect's model here as:
-  ameya_heights_structure.glb
-It will automatically replace the procedural Ameya Heights massing.
+Place the architects' models here (per city, see src/cities.js):\n  ameya_heights_chennai_v1.glb\n  ameya_heights_bengaluru_v1.glb\nEach automatically replaces the procedural massing for its city.\n

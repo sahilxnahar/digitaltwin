@@ -1,8 +1,10 @@
 import { PLACE_LAT, PLACE_LNG } from '../config.js'
 
-// Live environmental telemetry for Basaveshwar Nagar via Open-Meteo —
-// free, no API key required. All payloads are ephemeral: fetched, parsed
-// into a tiny plain object, rendered, discarded on the next poll.
+// Live environmental telemetry for the Chennai site. Layered free sources:
+//   weather: Open-Meteo (no key) → OpenWeatherMap fallback (VITE_OWM_KEY)
+//   AQI:     WAQI station feed (VITE_WAQI_TOKEN) → Open-Meteo air (no key)
+// All payloads are ephemeral: fetched, parsed into a tiny plain object,
+// rendered, discarded on the next poll.
 
 const WEATHER_URL =
   `https://api.open-meteo.com/v1/forecast` +
@@ -31,34 +33,75 @@ async function getJson(url, ms = 10000) {
   }
 }
 
+async function weatherOpenMeteo() {
+  const j = await getJson(WEATHER_URL)
+  const c = j && j.current
+  if (!c) throw new Error('open-meteo: no current block')
+  const precipitation = num(c.precipitation)
+  const rain = num(c.rain)
+  const code = num(c.weather_code)
+  return {
+    temp: num(c.temperature_2m),
+    precipitation,
+    isRaining:
+      (rain !== null && rain > 0) ||
+      (precipitation !== null && precipitation > 0.05) ||
+      (code !== null && RAIN_CODES.has(code)),
+  }
+}
+
+async function weatherOwm() {
+  const key = import.meta.env.VITE_OWM_KEY
+  if (!key) throw new Error('no VITE_OWM_KEY')
+  const j = await getJson(
+    `https://api.openweathermap.org/data/2.5/weather?lat=${PLACE_LAT}&lon=${PLACE_LNG}&units=metric&appid=${key}`
+  )
+  const main = j && j.weather && j.weather[0] && j.weather[0].main
+  return {
+    temp: num(j && j.main && j.main.temp),
+    precipitation: null,
+    isRaining: !!(j && j.rain) || ['Rain', 'Drizzle', 'Thunderstorm'].includes(main),
+  }
+}
+
+async function aqiWaqi() {
+  const token = import.meta.env.VITE_WAQI_TOKEN
+  if (!token) throw new Error('no VITE_WAQI_TOKEN')
+  const j = await getJson(`https://api.waqi.info/feed/geo:${PLACE_LAT};${PLACE_LNG}/?token=${token}`)
+  if (!j || j.status !== 'ok' || !Number.isFinite(j.data && j.data.aqi)) throw new Error('waqi: bad payload')
+  const pm = j.data.iaqi && j.data.iaqi.pm25 && j.data.iaqi.pm25.v
+  return { aqi: j.data.aqi, pm25: num(pm) }
+}
+
+async function aqiOpenMeteo() {
+  const j = await getJson(AIR_URL)
+  const c = j && j.current
+  if (!c) throw new Error('open-meteo air: no current block')
+  return { aqi: num(c.us_aqi), pm25: num(c.pm2_5) }
+}
+
 export async function fetchEnvironment() {
-  const [weather, air] = await Promise.allSettled([getJson(WEATHER_URL), getJson(AIR_URL)])
-
   const out = { temp: null, aqi: null, pm25: null, precipitation: null, isRaining: false }
-
-  if (weather.status === 'fulfilled') {
-    const c = weather.value && weather.value.current
-    if (c) {
-      out.temp = num(c.temperature_2m)
-      out.precipitation = num(c.precipitation)
-      const rain = num(c.rain)
-      const code = num(c.weather_code)
-      out.isRaining =
-        (rain !== null && rain > 0) ||
-        (out.precipitation !== null && out.precipitation > 0.05) ||
-        (code !== null && RAIN_CODES.has(code))
-    }
+  let got = false
+  try {
+    Object.assign(out, await weatherOpenMeteo())
+    got = true
+  } catch {
+    try {
+      Object.assign(out, await weatherOwm())
+      got = true
+    } catch { /* keep nulls */ }
   }
-  if (air.status === 'fulfilled') {
-    const c = air.value && air.value.current
-    if (c) {
-      out.aqi = num(c.us_aqi)
-      out.pm25 = num(c.pm2_5)
-    }
+  try {
+    Object.assign(out, await aqiWaqi())
+    got = true
+  } catch {
+    try {
+      Object.assign(out, await aqiOpenMeteo())
+      got = true
+    } catch { /* keep nulls */ }
   }
-  if (weather.status === 'rejected' && air.status === 'rejected') {
-    throw new Error('environment fetch failed')
-  }
+  if (!got) throw new Error('environment fetch failed')
   return out
 }
 

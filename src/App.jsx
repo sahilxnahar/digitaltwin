@@ -24,7 +24,7 @@ import { useLiveData } from './hooks/useLiveData.js'
 import { simState } from './state.js'
 
 // ─── Cinematic site tour: slow orbit around the proposed plot at
-// Havanur Circle (−95, 40) — kept in sync with PLOT in Buildings.jsx ───
+// the Ameya Heights plot (−95, 40) — kept in sync with PLOT in Buildings.jsx ───
 const TOUR_CENTER = new THREE.Vector3(-95, 0, 40)
 const TOUR_TARGET = new THREE.Vector3(-95, 22, 40) // mid-tower focus
 const TOUR_RADIUS = 95
@@ -106,7 +106,7 @@ function useFadeLayer(show, ms = 650) {
 export default function App() {
   const [mode, setMode] = useState('day') // 'day' | 'night' | 'rain'
   const [envAuto, setEnvAuto] = useState(true) // live environment drives mode
-  const [sunPos, setSunPos] = useState(null) // real Bengaluru sun position
+  const [sunPos, setSunPos] = useState(null) // real Chennai sun position
   // Manual override: forces a mode and detaches the live-environment driver
   const forceMode = (m) => {
     setEnvAuto(false)

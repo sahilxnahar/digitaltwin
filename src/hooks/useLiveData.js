@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { PLACE_LAT, PLACE_LNG, TRAFFIC_REFRESH_MS } from '../config.js'
+import { CITY, CITY_CFG, PLACE_LAT, PLACE_LNG, TRAFFIC_REFRESH_MS } from '../config.js'
 import { fetchTrafficFlow } from '../services/TrafficAPI.js'
 
 // Baked demo data — used whenever the key is missing or any fetch fails.
@@ -11,7 +11,7 @@ const DEMO_TRAFFIC = {
   confidence: 0.92,
   roadClosure: false,
 }
-const DEMO_AQI = { pm25: 48, station: 'Hebbal (demo)' }
+const DEMO_AQI = { pm25: 48, station: 'Manali (demo)' }
 
 function demoTraffic() {
   // gentle time-varying wobble so demo mode feels alive
@@ -41,7 +41,7 @@ async function fetchWithTimeout(url, ms = 10000) {
 async function fetchAqi(key) {
   const url =
     `https://api.data.gov.in/resource/3b01bcb8-0b14-4abf-b6f2-c1bfd384ba69` +
-    `?api-key=${key}&format=json&limit=100&filters%5Bcity%5D=Bengaluru`
+    `?api-key=${key}&format=json&limit=100&filters%5Bcity%5D=${encodeURIComponent(CITY_CFG.dataGovCity)}`
   const res = await fetchWithTimeout(url)
   if (!res.ok) throw new Error(`aqi http ${res.status}`)
   const json = await res.json()
@@ -50,7 +50,7 @@ async function fetchAqi(key) {
     (r) => r && (r.pollutant_id === 'PM2.5' || r.pollutant_id === 'PM25') && Number.isFinite(parseFloat(r.avg_value))
   )
   if (!rec) throw new Error('no PM2.5 record')
-  return { pm25: Math.round(parseFloat(rec.avg_value)), station: rec.station || 'Bengaluru' }
+  return { pm25: Math.round(parseFloat(rec.avg_value)), station: rec.station || CITY }
 }
 
 // All live payloads are ephemeral: fetched, parsed into a tiny plain object,

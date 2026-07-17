@@ -40,7 +40,7 @@ deployment → **Redeploy**. (Env changes only take effect on a new build.)
 
 - SPA rewrite: every route serves `index.html`, so refreshing the page on
   the live site never 404s. (Real static files still take precedence.)
-- Long-lived immutable caching for `/models/ameya_heights_structure.glb`,
+- Long-lived immutable caching for `/models/ameya_heights_chennai_v1.glb`,
   everything in `/models/` and `/assets/`, and other heavy media
   (glb/gltf/hdr/ktx2/images/mp4/fonts) — repeat visits skip the downloads.
 - If you ever replace the GLB with a new version, rename the file

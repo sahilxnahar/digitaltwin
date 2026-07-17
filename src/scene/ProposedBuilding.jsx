@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 // Proposed semi-commercial development: solid podium + sleek glass tower.
 // Deliberately contrasts with the matte instanced stock (high metalness,
 // low roughness) while still sitting naturally in the cinematic light.
-// Root position defaults to the Havanur Circle plot (kept in sync with
+// Root position defaults to the Ameya Heights plot (kept in sync with
 // PLOT in Buildings.jsx, which passes it explicitly).
 export default function ProposedBuilding({ position = [-95, 0, 40] }) {
   const glass = useMemo(

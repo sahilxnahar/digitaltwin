@@ -1,9 +1,9 @@
 import * as THREE from 'three'
 
-// Stylized Basaveshwar Nagar street grid (units ≈ meters)
-// Verticals:   Kamakshipalya Main Road (-150), 8th Main Road (-40), West of Chord Road (110)
-// Horizontals: Modi Hospital Road (-150), Siddaiah Puranik Road (-30), Magadi Main Road (110)
-// Havanur Circle = Siddaiah Puranik Road × 8th Main Road → junction (-40, -30)
+// Stylized central Chennai street grid (units ≈ meters)
+// Verticals:   College Road (-150), Sterling Road (-40), Pantheon Road (110)
+// Horizontals: Poonamallee High Road (-150), Anna Salai (-30), Cathedral Road (110)
+// Gemini Circle = Anna Salai × Sterling Road → junction (-40, -30)
 //
 // NOTE: the two scenario arterials intentionally keep their Z coordinates
 // (-150 construction band, 110 VIP band) so the Vehicles.jsx instancing +
@@ -13,14 +13,14 @@ export const ROAD_ZS = [-150, -30, 110]
 export const ROAD_W = 13
 export const WORLD = 245
 
-export const ROAD_NAMES_X = { '-150': 'Kamakshipalya Main Road', '-40': '8th Main Road', '110': 'West of Chord Road' }
-export const ROAD_NAMES_Z = { '-150': 'Modi Hospital Road', '-30': 'Siddaiah Puranik Road', '110': 'Magadi Main Road' }
+export const ROAD_NAMES_X = { '-150': 'College Road', '-40': 'Sterling Road', '110': 'Pantheon Road' }
+export const ROAD_NAMES_Z = { '-150': 'Poonamallee High Road', '-30': 'Anna Salai', '110': 'Cathedral Road' }
 
 export const ALL_JUNCTIONS = []
 for (const x of ROAD_XS) for (const z of ROAD_ZS) ALL_JUNCTIONS.push({ x, z })
 
 export const SIGNAL_JUNCTIONS = [
-  { x: -40, z: -30 }, // Havanur Circle (Siddaiah Puranik Rd × 8th Main Rd)
+  { x: -40, z: -30 }, // Gemini Circle (Siddaiah Puranik Rd × 8th Main Rd)
   { x: -40, z: -150 }, // 8th Main Rd × Modi Hospital Rd
   { x: 110, z: -30 }, // Siddaiah Puranik Rd × West of Chord Rd
   { x: -150, z: 110 }, // Kamakshipalya Main Rd × Magadi Main Rd

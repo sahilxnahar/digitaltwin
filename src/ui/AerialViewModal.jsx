@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { AERIAL_ADDRESS } from '../config.js'
 
 // Google Aerial View API — pre-rendered cinematic 3D drone video overlay.
 // Uses the primary Maps console key (VITE_GOOGLE_MAPS_KEY); the key must
@@ -8,7 +9,7 @@ import { useEffect, useRef, useState } from 'react'
 // rendering the video · ERROR → no key / no video / network failure ·
 // SUCCESS → autoplaying looped MP4.
 
-const DEFAULT_ADDRESS = 'Basaveshwar Nagar, Bengaluru, India'
+const DEFAULT_ADDRESS = AERIAL_ADDRESS
 const LOOKUP_URL = 'https://aerialview.googleapis.com/v1/videos:lookupVideo'
 
 export default function AerialViewModal({ address = DEFAULT_ADDRESS, onClose }) {

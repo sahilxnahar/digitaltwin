@@ -38,7 +38,7 @@ export default function Lighting({ mode, sunPos: liveSun }) {
     const r = 380
     return [r * Math.cos(el) * Math.sin(az), r * Math.sin(el), r * Math.cos(el) * Math.cos(az)]
   }, [])
-  // Live Bengaluru sun (real local time) when available; tuned constant otherwise
+  // Live Chennai sun (real local time) when available; tuned constant otherwise
   const sunPos = liveSun || defaultSun
 
   return (

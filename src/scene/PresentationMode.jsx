@@ -5,12 +5,12 @@ import { simState, schedulePresentationStep, stopPresentation, emitSimEvent } fr
 // Timeline (all timeouts registered via schedulePresentationStep so that
 // stopPresentation() — manual or natural — clears everything):
 //
-//   0s  macro view, high above Bengaluru, clean sim state, tower enabled
-//   4s  deck.gl FlyTo eases down to Basaveshwar Nagar (→ zoom 15+)
+//   0s  macro view, high above Chennai, clean sim state, tower enabled
+//   4s  deck.gl FlyTo eases down to the Chennai site (→ zoom 15+)
 //   8s  hybrid LOD crossfade into the three.js micro sim (usually already
 //       auto-triggered by the zoom threshold during the flight)
 //  10s  Site Tour orbit engages around the proposed building
-//  16s  'Construction' scenario — bottleneck builds on Modi Hospital Road
+//  16s  'Construction' scenario — bottleneck builds on Poonamallee High Road
 //  24s  reset to normal traffic, release the orbit, end of sequence
 export default function PresentationMode({ active, setViewMode }) {
   useEffect(() => {
@@ -35,7 +35,7 @@ export default function PresentationMode({ active, setViewMode }) {
       emitSimEvent('simChanged')
     }, 10000)
 
-    // Step 5 (16s): construction bottleneck on Modi Hospital Road
+    // Step 5 (16s): construction bottleneck on Poonamallee High Road
     schedulePresentationStep(() => {
       simState.scenario = 'construction'
       emitSimEvent('simChanged')

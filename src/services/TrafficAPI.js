@@ -1,7 +1,7 @@
 import { PLACE_LAT, PLACE_LNG } from '../config.js'
 
 // TomTom Traffic Flow API (free tier: 2,500 req/day) — live congestion for
-// the Basaveshwar Nagar corridor. Payloads are ephemeral: fetched, parsed,
+// the Ameya Heights Chennai corridor. Payloads are ephemeral: fetched, parsed,
 // rendered, discarded on the next refresh. Never persisted.
 
 const num = (v, fallback = null) => (Number.isFinite(v) ? v : fallback)

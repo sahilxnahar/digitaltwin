@@ -3,10 +3,11 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { ROAD_XS, ROAD_ZS, WORLD } from '../paths.js'
 import { simState } from '../state.js'
+import { CITY, CITY_CFG } from '../config.js'
 import { AmeyaHeightsSite } from './AmeyaHeightsModel.jsx'
 
-// Empty plot on the north-west corner of Havanur Circle
-// (Siddaiah Puranik Road × 8th Main Road), reserved for the
+// Empty plot on the north-west corner of Gemini Circle
+// (Anna Salai × Sterling Road), reserved for the
 // proposed development (A/B toggled from the HUD)
 const PLOT = { x: -95, z: 40, r: 38 }
 
@@ -17,9 +18,9 @@ const TINTS = ['#f5e9d2', '#e8d5b5', '#d9c6a8', '#cfd4d8', '#e2b28c', '#f0e6c8',
 
 // zones reserved for landmarks / park: [x1, x2, z1, z2]
 const EXCLUDE = [
-  [-140, -50, -228, -158], // KLE S. Nijalingappa College campus
-  [124, 186, -142, -74],   // Havanur Complex
-  [-18, 48, -18, 48],      // Basaveshwar Nagar park
+  [-140, -50, -228, -158], // Loyola College campus
+  [124, 186, -142, -74],   // Express Avenue
+  [-18, 48, -18, 48],      // Nungambakkam park
 ]
 
 function inExclude(x, z) {
@@ -232,9 +233,9 @@ export default function Buildings({ mode, onSelect }) {
         frustumCulled={false}
       />
 
-      {/* ── KLE S. Nijalingappa College campus (clickable landmark) ── */}
+      {/* ── Loyola College campus (clickable landmark) ── */}
       <group
-        onClick={(e) => { e.stopPropagation(); onSelect('KLE S. Nijalingappa College') }}
+        onClick={(e) => { e.stopPropagation(); onSelect(CITY_CFG.landmarks.campus) }}
         onPointerOver={hover(true)}
         onPointerOut={hover(false)}
       >
@@ -256,9 +257,9 @@ export default function Buildings({ mode, onSelect }) {
         </mesh>
       </group>
 
-      {/* ── Havanur Complex (glassy, clickable) ── */}
+      {/* ── Express Avenue (glassy, clickable) ── */}
       <group
-        onClick={(e) => { e.stopPropagation(); onSelect('Havanur Complex · West of Chord Rd') }}
+        onClick={(e) => { e.stopPropagation(); onSelect(CITY_CFG.landmarks.complex) }}
         onPointerOver={hover(true)}
         onPointerOut={hover(false)}
       >
@@ -271,9 +272,9 @@ export default function Buildings({ mode, onSelect }) {
         </mesh>
       </group>
 
-      {/* ── Basaveshwar Nagar park (clickable "the place") ── */}
+      {/* ── Nungambakkam park (clickable "the place") ── */}
       <group
-        onClick={(e) => { e.stopPropagation(); onSelect('Basaveshwar Nagar') }}
+        onClick={(e) => { e.stopPropagation(); onSelect(CITY_CFG.landmarks.park) }}
         onPointerOver={hover(true)}
         onPointerOut={hover(false)}
       >
@@ -297,7 +298,7 @@ export default function Buildings({ mode, onSelect }) {
           <AmeyaHeightsSite position={[PLOT.x, 0, PLOT.z]} />
           <SignBoard
             title="AMEYA HEIGHTS"
-            sub="S.V. Consultants · Semi-Commercial"
+            sub={`Premium Residences · ${CITY}`}
             position={[PLOT.x, 0, PLOT.z - 24]}
             width={12}
             premium
@@ -305,15 +306,10 @@ export default function Buildings({ mode, onSelect }) {
         </group>
       )}
 
-      {/* signage */}
-      <SignBoard title="BASAVESHWAR NAGAR" sub="Bengaluru — 560079" position={[-64, 0, -52]} rotationY={Math.PI / 4} width={13} />
-      <SignBoard title="Havanur Circle" sub="Siddaiah Puranik Road" position={[-16, 0, -52]} rotationY={-Math.PI / 4} width={11} />
-      <SignBoard title="KLE S. Nijalingappa College" sub="Modi Hospital Road" position={[-95, 0, -160]} width={13} />
-      <SignBoard title="Modi Hospital Road" position={[40, 0, -160]} width={10} />
-      <SignBoard title="Kamakshipalya Main Road" position={[-160, 0, 20]} rotationY={Math.PI / 2} width={12} />
-      <SignBoard title="8th Main Road" position={[-50, 0, -105]} rotationY={Math.PI / 2} width={9} />
-      <SignBoard title="Magadi Main Road" position={[60, 0, 120]} rotationY={Math.PI} width={10} />
-      <SignBoard title="West of Chord Road" position={[120, 0, 60]} rotationY={-Math.PI / 2} width={10} />
+      {/* signage — data-driven per city (src/cities.js) */}
+      {CITY_CFG.signboards.map((s, i) => (
+        <SignBoard key={i} {...s} />
+      ))}
     </group>
   )
 }

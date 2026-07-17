@@ -1,13 +1,14 @@
 import { useEffect } from 'react'
 import { simState, subscribeEnvironment, startEnvironmentPolling } from '../state.js'
+import { CITY_CFG } from '../config.js'
 
-// ─── Bengaluru solar model: real local (IST) time → sun position ───
-const SUNRISE = 6.1 // ≈ 06:06 IST
-const SUNSET = 18.6 // ≈ 18:36 IST
+// ─── Chennai solar model: real local (IST) time → sun position ───
+const SUNRISE = CITY_CFG.sun.rise
+const SUNSET = CITY_CFG.sun.set
 const MAX_ELEVATION = 68 // deg, near-equatorial noon
 const SUN_DISTANCE = 380
 
-function bengaluruHourNow() {
+function chennaiHourNow() {
   const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Asia/Kolkata',
     hour: 'numeric',
@@ -18,8 +19,8 @@ function bengaluruHourNow() {
   return get('hour') + get('minute') / 60
 }
 
-export function bengaluruSun() {
-  const t = bengaluruHourNow()
+export function chennaiSun() {
+  const t = chennaiHourNow()
   const frac = (t - SUNRISE) / (SUNSET - SUNRISE) // 0 sunrise → 1 sunset
   const elevationDeg = Math.sin(Math.PI * Math.min(Math.max(frac, 0), 1)) * MAX_ELEVATION
   const isDaylight = frac > 0 && frac < 1
@@ -37,7 +38,7 @@ export function bengaluruSun() {
 }
 
 // Non-visual controller: starts the 15-min Open-Meteo poll, keeps the sun
-// synced to real Bengaluru time, and (unless the user has taken a manual
+// synced to real Chennai time, and (unless the user has taken a manual
 // override) drives day / night / rain automatically from live telemetry.
 export default function EnvironmentController({ enabled, onModeChange, onSunChange }) {
   useEffect(() => {
@@ -46,7 +47,7 @@ export default function EnvironmentController({ enabled, onModeChange, onSunChan
 
   useEffect(() => {
     const apply = () => {
-      const sun = bengaluruSun()
+      const sun = chennaiSun()
       onSunChange(sun.position)
       if (enabled) {
         const auto = simState.environmentalData.isRaining ? 'rain' : sun.isDaylight ? 'day' : 'night'

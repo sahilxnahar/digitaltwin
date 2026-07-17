@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
-import { CORRIDOR_VEH_PER_HR, PLACE_NAME, CITY } from '../config.js'
-import { simState, subscribeEnvironment, onSimEvent, startPresentation, stopPresentation } from '../state.js'
+import { CORRIDOR_VEH_PER_HR, PLACE_NAME, CITY, CITY_CFG } from '../config.js'
+import { simState, subscribeEnvironment, onSimEvent, emitSimEvent, startPresentation, stopPresentation } from '../state.js'
 import { aqiInfo } from '../services/EnvironmentAPI.js'
 import AerialViewModal from './AerialViewModal.jsx'
 import NeighborhoodDiscovery from './NeighborhoodDiscovery.jsx'
+import EnquiryModal from './EnquiryModal.jsx'
+import CitySwitcher from './CitySwitcher.jsx'
 
 const SCENARIOS = [
   { id: 'normal', label: 'Normal' },
@@ -31,6 +33,12 @@ export default function HUD({
 }) {
   const [showAerial, setShowAerial] = useState(false)
   const [showDiscovery, setShowDiscovery] = useState(false)
+  const [showEnquiry, setShowEnquiry] = useState(false)
+  const [travelTime, setTravelTime] = useState(false)
+  const toggleTravelTime = () => {
+    setTravelTime((v) => !v)
+    emitSimEvent('toggleIsochrones')
+  }
 
   // Live environment (Open-Meteo, 15-min poll)
   const [env, setEnv] = useState(simState.environmentalData)
@@ -82,6 +90,7 @@ export default function HUD({
 
   return (
     <div className="hud">
+      <CitySwitcher />
       {data.source === 'demo' && (
         <div className="banner">Showing demo data — add your API key for live data</div>
       )}
@@ -127,19 +136,22 @@ export default function HUD({
         <button className="aerial-btn disc-toggle" onClick={() => setShowDiscovery((v) => !v)}>
           📍 NEIGHBORHOOD DISCOVERY
         </button>
+        <button className="aerial-btn enq-toggle" onClick={() => setShowEnquiry(true)}>✉ ENQUIRE NOW</button>
       </div>
 
       {showAerial && <AerialViewModal onClose={() => setShowAerial(false)} />}
       {showDiscovery && <NeighborhoodDiscovery onClose={() => setShowDiscovery(false)} />}
+      {showEnquiry && <EnquiryModal onClose={() => setShowEnquiry(false)} />}
 
       <div className="panel controls">
         {/* hybrid LOD toggle */}
         <Btn on={viewMode === 'macro'} onClick={() => setViewMode('macro')}>City View</Btn>
         <Btn on={viewMode === 'micro'} onClick={() => setViewMode('micro')}>Site View</Btn>
         {viewMode === 'macro' && (
-          <span className="dim small" style={{ margin: '0 4px' }}>
-            zoom into Basaveshwar Nagar (z≥15) to enter the site
-          </span>
+          <>
+            <Btn on={travelTime} onClick={toggleTravelTime}>⏱ Travel Time</Btn>
+            <span className="dim small" style={{ margin: '0 4px' }}>{CITY_CFG.hint}</span>
+          </>
         )}
         {viewMode === 'micro' && (
           <>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { PLACE_LAT, PLACE_LNG } from '../config.js'
+import { CITY, PLACE_LAT, PLACE_LNG } from '../config.js'
 import { loadGoogleMaps } from '../services/googleMaps.js'
+import { fetchAmenitySnapshot } from '../services/LocationIntelAPI.js'
 
 // Neighborhood Discovery sidebar — 100% React DOM overlay.
 // Uses PlacesService bound to a DETACHED div (no map, no markers, no
@@ -28,6 +29,15 @@ export default function NeighborhoodDiscovery({ onClose }) {
   const [selected, setSelected] = useState(null)
   const [detail, setDetail] = useState(null)
   const svc = useRef(null)
+  const [snap, setSnap] = useState(null) // live OSM amenity counts
+
+  useEffect(() => {
+    let cancelled = false
+    fetchAmenitySnapshot()
+      .then((s) => !cancelled && setSnap(s))
+      .catch(() => {}) // keyless OSM snapshot is best-effort
+    return () => { cancelled = true }
+  }, [])
 
   // ── Nearby search (list view) ──
   useEffect(() => {
@@ -150,7 +160,21 @@ export default function NeighborhoodDiscovery({ onClose }) {
         <span className="serif-title">NEIGHBORHOOD DISCOVERY</span>
         <button className="close" onClick={onClose}>✕</button>
       </div>
-      <div className="dim small disc-sub">around Ameya Heights · Basaveshwar Nagar · {RADIUS_M / 1000} km radius</div>
+      <div className="dim small disc-sub">around Ameya Heights · {CITY} · {RADIUS_M / 1000} km radius</div>
+
+      {snap && (
+        <>
+          <div className="snap-grid">
+            {[['transit', snap.transit], ['dining', snap.dining], ['education', snap.education], ['health', snap.healthcare], ['parks', snap.parks], ['banking', snap.banking]].map(([k, v]) => (
+              <div key={k} className="snap-cell">
+                <span className="snap-num">{v}</span>
+                <span className="dim small">{k}</span>
+              </div>
+            ))}
+          </div>
+          <div className="dim small" style={{ margin: '0 0 6px' }}>live OpenStreetMap counts · 1.5 km</div>
+        </>
+      )}
 
       {view === 'list' && (
         <>

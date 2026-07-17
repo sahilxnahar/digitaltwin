@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import DeckGL from '@deck.gl/react'
-import { FlyToInterpolator, PathLayer, ScatterplotLayer, TextLayer, GeoJsonLayer, Tile3DLayer, TripsLayer } from 'deck.gl'
+import { FlyToInterpolator, PathLayer, ScatterplotLayer, TextLayer, GeoJsonLayer, Tile3DLayer, TileLayer, BitmapLayer, TripsLayer } from 'deck.gl'
 import { Map as MapLibreMap } from 'react-map-gl/maplibre'
 import { Map as MapboxMap } from 'react-map-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { CITY_CFG, PLACE_LAT, PLACE_LNG, PLACE_NAME } from '../config.js'
-import { onSimEvent, emitSimEvent } from '../state.js'
+import { onSimEvent, emitSimEvent, simState } from '../state.js'
 import { fetchIsochrones } from '../services/LocationIntelAPI.js'
+import { getMapState } from '../mapStore.js'
 
 // ─── Google Maps Photorealistic 3D Tiles ───
 // Requires "Map Tiles API" enabled on the key. While no key is present the
@@ -16,8 +17,59 @@ const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY || 'PASTE_GOOGL
 const HAS_GOOGLE_KEY = !!GOOGLE_MAPS_API_KEY && !GOOGLE_MAPS_API_KEY.startsWith('PASTE_')
 const GOOGLE_3D_TILES_URL = `https://tile.googleapis.com/v1/3dtiles/root.json?key=${GOOGLE_MAPS_API_KEY}`
 
+// ─── MapTiler dark basemap (optional, free tier needs NO card) ───
+// Sign up: https://cloud.maptiler.com → key on the dashboard
+const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY || ''
+const HAS_MAPTILER_KEY = MAPTILER_KEY.length > 4
+const MAPTILER_STYLE = `https://api.maptiler.com/maps/dataviz-dark/style.json?key=${MAPTILER_KEY}`
+const WAQI_TOKEN = import.meta.env.VITE_WAQI_TOKEN || ''
+
+// Resolve the vector basemap style for the current map options
+function resolveBasemapStyle(ms) {
+  if (HAS_MAPTILER_KEY) {
+    const id =
+      ms.basemap === 'satellite' ? 'hybrid'
+        : ms.basemap === 'terrain' ? 'outdoor-v2'
+          : ms.timeOfDay === 'day' ? 'streets-v2'
+            : 'dataviz-dark'
+    return `https://api.maptiler.com/maps/${id}/style.json?key=${MAPTILER_KEY}`
+  }
+  if (ms.basemap === 'default' && ms.timeOfDay === 'day')
+    return 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'
+  return BASEMAP_STYLE // keyless satellite/terrain unavailable → dark fallback
+}
+
+// ─── Contextual data layers: free raster tile feeds ───
+const OVERLAY_TILES = {
+  aqi: () => (WAQI_TOKEN ? `https://tiles.aqicn.org/tiles/usepa-aqi/{z}/{x}/{y}.png?token=${WAQI_TOKEN}` : null),
+  transit: () => 'https://tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png',
+  cycling: () => 'https://tile.waymarkedtrails.org/cycling/{z}/{x}/{y}.png',
+  fire: () => 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_Thermal_Anomalies_All/default/default/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png',
+}
+const OVERLAY_OPACITY = { aqi: 0.65, transit: 0.8, cycling: 0.85, fire: 0.9 }
+const OVERLAY_MAXZOOM = { aqi: 11, transit: 18, cycling: 17, fire: 9 }
+
+function rasterOverlay(id, url) {
+  return new TileLayer({
+    id: `overlay-${id}`,
+    data: url,
+    tileSize: 256,
+    maxZoom: OVERLAY_MAXZOOM[id],
+    opacity: OVERLAY_OPACITY[id],
+    onTileError: () => {}, // a missing tile must never break the scene
+    renderSubLayers: (props) => {
+      const bb = props.tile.boundingBox
+      return new BitmapLayer(props, {
+        data: null,
+        image: props.data,
+        bounds: [bb[0][0], bb[0][1], bb[1][0], bb[1][1]],
+      })
+    },
+  })
+}
+
 // ─── Mapbox premium dark basemap (optional) ───
-// Basemap priority: Google 3D Tiles → Mapbox Dark → Carto Dark Matter
+// Basemap priority: Google 3D Tiles → Mapbox Dark → MapTiler Dark → Carto Dark Matter
 const MAPBOX_KEY = import.meta.env.VITE_MAPBOX_KEY || ''
 const HAS_MAPBOX_KEY = MAPBOX_KEY.startsWith('pk.')
 const MAPBOX_STYLE = 'mapbox://styles/mapbox/dark-v11'
@@ -55,6 +107,8 @@ export default function GeospatialMap({ onEnterMicro, presenting = false }) {
   const [initialViewState, setInitialViewState] = useState(INITIAL_VIEW_STATE)
   const [time, setTime] = useState(0)
   const lastView = useRef(INITIAL_VIEW_STATE) // latest camera pose (uncontrolled)
+  const ms = getMapState() // fresh every frame (component re-renders on the time tick)
+  const tilesActive = HAS_GOOGLE_KEY && ms.show3dTiles && ms.basemap === 'default'
   const [isoData, setIsoData] = useState(null)
   const [showIso, setShowIso] = useState(false)
 
@@ -76,6 +130,25 @@ export default function GeospatialMap({ onEnterMicro, presenting = false }) {
     [isoData]
   )
 
+  // consume a search fly-to that was queued while this map was unmounted
+  useEffect(() => {
+    const p = simState.pendingFlyTo
+    if (!p) return
+    simState.pendingFlyTo = null
+    setInitialViewState({
+      minZoom: 8.5,
+      maxZoom: 16.5,
+      longitude: p.longitude,
+      latitude: p.latitude,
+      zoom: p.zoom || 15.2,
+      pitch: 50,
+      bearing: 0,
+      transitionDuration: 2600,
+      transitionInterpolator: new FlyToInterpolator({ speed: 1.4 }),
+      transitionEasing: (t) => 1 - Math.pow(1 - t, 3),
+    })
+  }, [])
+
   useEffect(() => {
     let raf
     const loop = () => {
@@ -89,7 +162,7 @@ export default function GeospatialMap({ onEnterMicro, presenting = false }) {
   // Presentation sequencer + on-screen navigation → smooth camera flights
   useEffect(
     () =>
-      onSimEvent((type) => {
+      onSimEvent((type, payload) => {
         const fly = (target, ms, speed = 1.4) =>
           setInitialViewState({
             minZoom: 8.5,
@@ -116,6 +189,9 @@ export default function GeospatialMap({ onEnterMicro, presenting = false }) {
           )
         } else if (type === 'navReset') {
           fly(INITIAL_VIEW_STATE, 1200)
+        } else if (type === 'flyToLocation' && payload) {
+          simState.pendingFlyTo = null
+          fly({ longitude: payload.longitude, latitude: payload.latitude, zoom: payload.zoom || 15.2, pitch: 50, bearing: 0 }, 2400)
         }
       }),
     []
@@ -139,13 +215,60 @@ export default function GeospatialMap({ onEnterMicro, presenting = false }) {
 
   const layers = useMemo(
     () => [
-      // photorealistic 3D Chennai buildings (only when a key is provided)
-      HAS_GOOGLE_KEY &&
+      // photorealistic 3D buildings (hidden in satellite/terrain or when toggled off)
+      tilesActive &&
         new Tile3DLayer({
           id: 'google-3d-tiles',
           data: GOOGLE_3D_TILES_URL,
           onTilesetLoad: () => emitSimEvent('tilesLoaded'), // releases the loading screen
           onTileError: () => {}, // a failed tile must never break the scene
+        }),
+      // contextual raster data layers (AQI / transit / cycling / wildfire)
+      ...Object.keys(OVERLAY_TILES)
+        .filter((k) => ms.overlays[k])
+        .map((k) => {
+          const url = OVERLAY_TILES[k]()
+          return url ? rasterOverlay(k, url) : null
+        }),
+      // premium corridor hotspot: champagne ring + luxury POI highlights
+      ms.hotspot &&
+        new ScatterplotLayer({
+          id: 'hotspot-ring',
+          data: [ms.hotspot],
+          getPosition: (d) => [d.lng, d.lat],
+          radiusUnits: 'meters',
+          getRadius: (d) => d.radius || 800,
+          stroked: true,
+          filled: true,
+          getFillColor: [230, 215, 178, 24],
+          getLineColor: [230, 215, 178, 210],
+          lineWidthMinPixels: 2,
+        }),
+      ms.hotspot &&
+        new ScatterplotLayer({
+          id: 'hotspot-pois',
+          data: ms.hotspot.pois || [],
+          getPosition: (d) => [d.lng, d.lat],
+          radiusUnits: 'meters',
+          getRadius: 40,
+          getFillColor: [230, 215, 178, 235],
+          stroked: true,
+          getLineColor: [8, 10, 14, 220],
+          lineWidthMinPixels: 1.5,
+        }),
+      ms.hotspot &&
+        new TextLayer({
+          id: 'hotspot-poi-names',
+          data: ms.hotspot.pois || [],
+          getPosition: (d) => [d.lng, d.lat],
+          getText: (d) => d.name,
+          getSize: 12.5,
+          getColor: [230, 215, 178, 255],
+          getPixelOffset: [0, -18],
+          fontFamily: 'Georgia, serif',
+          background: true,
+          getBackgroundColor: [8, 10, 14, 195],
+          backgroundPadding: [6, 3],
         }),
       // ORS drive-time isochrones (10/20/30 min) around the site
       showIso && isoData &&
@@ -190,6 +313,19 @@ export default function GeospatialMap({ onEnterMicro, presenting = false }) {
         fadeTrail: true,
         opacity: 0.95,
       }),
+      // street/arterial name labels (visible over 3D tiles and basemaps)
+      new TextLayer({
+        id: 'arterial-names',
+        data: TRIPS.map((a) => ({ position: a.path[Math.floor(a.path.length / 2)], text: a.name })),
+        getPosition: (d) => d.position,
+        getText: (d) => d.text,
+        getSize: 11,
+        getColor: [200, 208, 216, 230],
+        fontFamily: 'Menlo, Consolas, monospace',
+        background: true,
+        getBackgroundColor: [8, 10, 14, 165],
+        backgroundPadding: [4, 2],
+      }),
       // pulsing beacon over the micro-sim site
       new ScatterplotLayer({
         id: 'site-pulse',
@@ -220,20 +356,38 @@ export default function GeospatialMap({ onEnterMicro, presenting = false }) {
     [time, isoData, showIso]
   )
 
+  const handleMapClick = (info) => {
+    // Street View mode: clicking the map opens the Google panorama at that
+    // point (coverage layers require a google.maps.Map instance, which our
+    // detached-DOM architecture forbids — this is the clean equivalent)
+    const s = getMapState()
+    if (s.overlays.streetview && info && info.coordinate) {
+      window.open(
+        `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${info.coordinate[1]},${info.coordinate[0]}`,
+        '_blank'
+      )
+    }
+  }
+
   return (
     <DeckGL
       initialViewState={initialViewState}
       onViewStateChange={handleViewState}
+      onClick={handleMapClick}
       controller={!presenting} // lock manual camera input during the presentation
       layers={layers}
     >
-      {/* basemap tiers (skipped entirely when Google 3D Tiles are active):
-          Mapbox Dark when a token is set, otherwise free Carto Dark Matter */}
-      {!HAS_GOOGLE_KEY &&
-        (HAS_MAPBOX_KEY ? (
-          <MapboxMap reuseMaps mapboxAccessToken={MAPBOX_KEY} mapStyle={MAPBOX_STYLE} />
+      {/* basemap tiers (hidden while Google 3D Tiles are active):
+          Mapbox (default only) → MapTiler day/night/satellite/terrain → Carto */}
+      {!tilesActive &&
+        (HAS_MAPBOX_KEY && ms.basemap === 'default' ? (
+          <MapboxMap
+            reuseMaps
+            mapboxAccessToken={MAPBOX_KEY}
+            mapStyle={ms.timeOfDay === 'day' ? 'mapbox://styles/mapbox/light-v11' : MAPBOX_STYLE}
+          />
         ) : (
-          <MapLibreMap reuseMaps mapStyle={BASEMAP_STYLE} />
+          <MapLibreMap reuseMaps mapStyle={resolveBasemapStyle(ms)} />
         ))}
     </DeckGL>
   )

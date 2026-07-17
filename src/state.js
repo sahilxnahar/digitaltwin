@@ -12,6 +12,7 @@ export const simState = {
   viewMode: 'macro', // 'macro' (city-scale deck.gl map) | 'micro' (three.js site sim)
   environmentalData: { temp: null, aqi: null, isRaining: false, lastUpdate: null },
   isPresentationActive: false, // scripted cinematic fly-through running
+  pendingFlyTo: null, // search result awaiting the macro map (consumed on mount)
 }
 
 // ─── Lightweight sim event bus (presentation steps, HUD re-sync, fly-to) ───
@@ -20,8 +21,8 @@ export function onSimEvent(fn) {
   simEventListeners.add(fn)
   return () => simEventListeners.delete(fn)
 }
-export function emitSimEvent(type) {
-  simEventListeners.forEach((fn) => fn(type))
+export function emitSimEvent(type, payload) {
+  simEventListeners.forEach((fn) => fn(type, payload))
 }
 
 // ─── Presentation sequence actions ───

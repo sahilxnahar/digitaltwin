@@ -284,7 +284,7 @@ canvas { display: block; }
 
 .banner {
   position: absolute;
-  top: 54px;
+  top: 96px;
   left: 50%;
   transform: translateX(-50%);
   background: rgba(122, 82, 12, 0.85);
@@ -371,3 +371,87 @@ button.on { background: #274b35; border-color: #5ad67d; color: #9fe8b8; }
   border-color: #5ad67d;
   color: #9fe8b8;
 }
+
+
+/* location search (Google-Maps style) */
+.search-bar {
+  position: fixed;
+  top: 54px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(360px, 86vw);
+  z-index: 39;
+  pointer-events: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.search-bar input {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 12px;
+  color: #e8edf2;
+  background: rgba(8, 10, 14, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 8px 12px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.search-bar input:focus { outline: 1px solid #5ad67d; }
+.search-busy { position: absolute; right: 10px; top: 7px; color: #7a838c; }
+.search-results {
+  margin-top: 4px;
+  background: rgba(8, 10, 14, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.search-results button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-size: 11px;
+  color: #cfd6dd;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0;
+  padding: 8px 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.search-results button:hover { background: rgba(90, 214, 125, 0.12); }
+
+
+/* map options / property filter floating panels */
+.map-controls {
+  position: fixed;
+  left: 14px;
+  bottom: 118px;
+  z-index: 26;
+  pointer-events: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.map-controls > .aerial-btn { width: auto; margin-top: 0; }
+.map-controls > .aerial-btn.on { background: #27405a; }
+.map-panel {
+  position: absolute;
+  bottom: 42px;
+  left: 0;
+  width: 274px;
+  max-height: 62vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.map-panel .serif-title { font-size: 14px; margin-bottom: 2px; }
+.map-panel .label { margin-top: 6px; }
+.map-row { display: flex; gap: 5px; flex-wrap: wrap; }
+.map-row button { font-size: 10px; padding: 4px 8px; text-transform: capitalize; }
+.map-row.wrap button { flex: 0 1 auto; }
+.map-col { display: flex; flex-direction: column; gap: 4px; }
+.map-col button { text-align: left; font-size: 10.5px; padding: 5px 9px; }

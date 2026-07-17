@@ -6,6 +6,9 @@ import AerialViewModal from './AerialViewModal.jsx'
 import NeighborhoodDiscovery from './NeighborhoodDiscovery.jsx'
 import EnquiryModal from './EnquiryModal.jsx'
 import CitySwitcher from './CitySwitcher.jsx'
+import SearchBar from './SearchBar.jsx'
+import MapControls from './MapControls.jsx'
+import PropertyFilters from './PropertyFilters.jsx'
 
 const SCENARIOS = [
   { id: 'normal', label: 'Normal' },
@@ -91,6 +94,7 @@ export default function HUD({
   return (
     <div className="hud">
       <CitySwitcher />
+      <SearchBar viewMode={viewMode} setViewMode={setViewMode} />
       {data.source === 'demo' && (
         <div className="banner">Showing demo data — add your API key for live data</div>
       )}
@@ -142,6 +146,8 @@ export default function HUD({
       {showAerial && <AerialViewModal onClose={() => setShowAerial(false)} />}
       {showDiscovery && <NeighborhoodDiscovery onClose={() => setShowDiscovery(false)} />}
       {showEnquiry && <EnquiryModal onClose={() => setShowEnquiry(false)} />}
+      {viewMode === 'macro' && <MapControls />}
+      {viewMode === 'micro' && <PropertyFilters />}
 
       <div className="panel controls">
         {/* hybrid LOD toggle */}

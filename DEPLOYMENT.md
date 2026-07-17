@@ -19,12 +19,19 @@
 4. **BEFORE clicking Deploy**, expand the **Environment Variables** section
    on that same Configure Project screen. Add each variable one at a time:
 
-   | Name (Key field)       | Value (Value field)          |
-   |------------------------|------------------------------|
-   | `VITE_GOOGLE_MAPS_KEY` | your Google Maps key         |
-   | `VITE_TOMTOM_KEY`      | your TomTom key              |
-   | `VITE_MAPBOX_KEY`      | your Mapbox pk.… token       |
-   | `VITE_DATA_GOV_KEY`    | your data.gov.in key (opt.)  |
+   | Name (Key field)            | Value (Value field)                          |
+|-----------------------------|----------------------------------------------|
+| `VITE_GOOGLE_MAPS_KEY`      | Google Maps key (3D tiles, Places, Aerial)   |
+| `VITE_TOMTOM_KEY`           | TomTom traffic key                           |
+| `VITE_MAPTILER_KEY`         | MapTiler key (basemaps: day/satellite/terrain) |
+| `VITE_MAPBOX_KEY`           | Mapbox pk.… token (optional)                 |
+| `VITE_ORS_KEY`              | OpenRouteService key (travel-time rings)     |
+| `VITE_WAQI_TOKEN`           | WAQI token (station AQI + AQI map layer)     |
+| `VITE_OWM_KEY`              | OpenWeatherMap key (weather fallback)        |
+| `VITE_DATA_GOV_KEY`         | data.gov.in key (optional)                   |
+| `VITE_EMAILJS_SERVICE_ID`   | EmailJS service ID                           |
+| `VITE_EMAILJS_TEMPLATE_ID`  | EmailJS template ID                          |
+| `VITE_EMAILJS_PUBLIC_KEY`   | EmailJS public key                           |
 
    Type the name, paste the value, click **Add**. Repeat for all keys.
    Leave the environment scope at the default (All Environments).
@@ -40,7 +47,7 @@ deployment → **Redeploy**. (Env changes only take effect on a new build.)
 
 - SPA rewrite: every route serves `index.html`, so refreshing the page on
   the live site never 404s. (Real static files still take precedence.)
-- Long-lived immutable caching for `/models/ameya_heights_chennai_v1.glb`,
+- Long-lived immutable caching for `/models/ameya_heights_chennai_v1.glb` and `/models/ameya_heights_bengaluru_v1.glb`,
   everything in `/models/` and `/assets/`, and other heavy media
   (glb/gltf/hdr/ktx2/images/mp4/fonts) — repeat visits skip the downloads.
 - If you ever replace the GLB with a new version, rename the file

@@ -4,6 +4,7 @@ import { useFrame } from '@react-three/fiber'
 import { ROAD_XS, ROAD_ZS, WORLD } from '../paths.js'
 import { simState } from '../state.js'
 import { CITY, CITY_CFG } from '../config.js'
+import { getMapState } from '../mapStore.js'
 import { AmeyaHeightsSite } from './AmeyaHeightsModel.jsx'
 
 // Empty plot on the north-west corner of Gemini Circle
@@ -15,6 +16,17 @@ const dummy = new THREE.Object3D()
 const tmpColor = new THREE.Color()
 
 const TINTS = ['#f5e9d2', '#e8d5b5', '#d9c6a8', '#cfd4d8', '#e2b28c', '#f0e6c8', '#d8cdb4']
+
+// Land-use category styling. STRICT RULE: government buildings render red
+// permanently, overriding every other visual state (incl. dim-on-filter).
+const CAT_STYLE = {
+  government: { color: '#c0392b', dim: '#6e2c24' },
+  commercial: { color: '#8fa8c0' },
+  apartment: { color: null }, // uses the per-instance warm tint
+  plotted: { color: '#c9b88a' },
+  empty: { color: '#6f6047' },
+}
+const DIM_GREY = '#26292f'
 
 // zones reserved for landmarks / park: [x1, x2, z1, z2]
 const EXCLUDE = [
@@ -140,6 +152,11 @@ export default function Buildings({ mode, onSelect }) {
   const [showDev, setShowDev] = useState(simState.showDevelopment)
   useFrame(() => {
     if (simState.showDevelopment !== showDev) setShowDev(simState.showDevelopment)
+    const v = getMapState()._v
+    if (v !== lastFilterV.current) {
+      lastFilterV.current = v
+      applyCategoryColors()
+    }
   })
 
   const sideMat = useMemo(
@@ -188,8 +205,22 @@ export default function Buildings({ mode, onSelect }) {
             if (inExclude(x, z)) continue
             if (Math.hypot(x - PLOT.x, z - PLOT.z) < PLOT.r) continue // carved-out plot
             const r = rng()
-            const h = r < 0.68 ? 8 + rng() * 10 : r < 0.94 ? 18 + rng() * 12 : 30 + rng() * 12
-            out.push({ x, z, w: 11 + rng() * 9, d: 11 + rng() * 9, h })
+            let h = r < 0.68 ? 8 + rng() * 10 : r < 0.94 ? 18 + rng() * 12 : 30 + rng() * 12
+            // land-use categorization (drives the property filters)
+            const roll = rng()
+            const cat =
+              roll < 0.08 ? 'government'
+                : roll < 0.26 ? 'commercial'
+                  : roll < 0.4 ? 'plotted'
+                    : roll < 0.5 ? 'empty'
+                      : 'apartment'
+            if (cat === 'plotted') h = 2.6 // boundary walls of a plotted development
+            if (cat === 'empty') h = 0.4 // open land, zero construction
+            const floors = cat === 'plotted' || cat === 'empty' ? 0 : Math.max(1, Math.round(h / 3.2))
+            out.push({
+              x, z, w: 11 + rng() * 9, d: 11 + rng() * 9, h, cat, floors,
+              tint: TINTS[Math.floor(rng() * TINTS.length)],
+            })
             if (out.length >= 320) return out
           }
         }
@@ -205,11 +236,30 @@ export default function Buildings({ mode, onSelect }) {
       dummy.scale.set(b.w, b.h, b.d)
       dummy.updateMatrix()
       meshRef.current.setMatrixAt(i, dummy.matrix)
-      meshRef.current.setColorAt(i, tmpColor.set(TINTS[Math.floor(Math.random() * TINTS.length)]))
     })
     meshRef.current.instanceMatrix.needsUpdate = true
-    if (meshRef.current.instanceColor) meshRef.current.instanceColor.needsUpdate = true
+    applyCategoryColors()
   }, [items])
+
+  // ── Property filtration: recolor instances when filters change ──
+  const lastFilterV = useRef(-1)
+  const applyCategoryColors = () => {
+    const mesh = meshRef.current
+    if (!mesh) return
+    const { filters } = getMapState()
+    items.forEach((b, i) => {
+      const matches =
+        (!filters.floors || b.floors === filters.floors) &&
+        (!filters.category || b.cat === filters.category)
+      const st = CAT_STYLE[b.cat]
+      let c
+      if (b.cat === 'government') c = matches ? st.color : st.dim // red always wins
+      else if (!matches) c = DIM_GREY
+      else c = st.color || b.tint
+      mesh.setColorAt(i, tmpColor.set(c))
+    })
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+  }
 
   const hover = (on) => (e) => {
     e.stopPropagation()

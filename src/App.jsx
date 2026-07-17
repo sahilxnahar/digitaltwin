@@ -19,6 +19,7 @@ import Rain from './scene/Rain.jsx'
 // to restore the cinematic pipeline once performance is acceptable.
 import HUD from './ui/HUD.jsx'
 import NavigationControls from './ui/NavigationControls.jsx'
+import StreetLabels from './scene/StreetLabels.jsx'
 import LoadingScreen from './ui/LoadingScreen.jsx'
 import { useLiveData } from './hooks/useLiveData.js'
 import { simState } from './state.js'
@@ -172,6 +173,7 @@ export default function App() {
             <Trees />
             <StreetLights mode={mode} />
             <TrafficSignals />
+            <StreetLabels />
             <Vehicles mode={mode} />
             {mode === 'rain' && <Rain />}
             <OrbitControls

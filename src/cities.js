@@ -17,6 +17,8 @@ export const CITIES = {
     hint: 'zoom into central Chennai (z≥15) to enter the site',
     loadingSub: 'DIGITAL TWIN · CHENNAI · LUXURY RESIDENCES',
     macroView: { longitude: 80.235, latitude: 13.02, zoom: 10.4, pitch: 45, bearing: -12 },
+    roadNamesX: { '-150': 'College Road', '-40': 'Sterling Road', '110': 'Pantheon Road' },
+    roadNamesZ: { '-150': 'Poonamallee High Road', '-30': 'Anna Salai', '110': 'Cathedral Road' },
     landmarks: {
       campus: 'Loyola College',
       complex: 'Express Avenue · Pantheon Rd',
@@ -54,6 +56,36 @@ export const CITIES = {
       { name: 'Nungambakkam High Road', color: [90, 214, 125],
         path: [[80.24, 13.06], [80.25, 13.07], [80.26, 13.08]] },
     ],
+    hotspots: [
+      { id: 'guindy', name: 'Guindy · ITC Grand Chola', lng: 80.2206, lat: 13.0103, radius: 900, zoom: 14.6,
+        pois: [
+          { name: 'ITC Grand Chola', lng: 80.2206, lat: 13.0103 },
+          { name: 'Olympia Tech Park', lng: 80.2098, lat: 13.0125 },
+          { name: 'Guindy National Park', lng: 80.2295, lat: 13.0045 },
+        ] },
+      { id: 'nungambakkam', name: 'Nungambakkam · Taj Coromandel', lng: 80.2438, lat: 13.0555, radius: 850, zoom: 14.7,
+        pois: [
+          { name: 'Taj Coromandel', lng: 80.2436, lat: 13.0553 },
+          { name: 'Khader Nawaz Khan Road', lng: 80.2452, lat: 13.0601 },
+          { name: 'Sterling Road Junction', lng: 80.2402, lat: 13.0623 },
+        ] },
+      { id: 'connemara', name: 'Anna Salai · Taj Connemara', lng: 80.2612, lat: 13.0632, radius: 850, zoom: 14.7,
+        pois: [
+          { name: 'Taj Connemara', lng: 80.2609, lat: 13.0629 },
+          { name: 'Express Avenue Mall', lng: 80.2646, lat: 13.0588 },
+          { name: 'LIC Building · Anna Salai', lng: 80.2705, lat: 13.0637 },
+        ] },
+      { id: 'tnagar', name: 'T. Nagar Retail District', lng: 80.2341, lat: 13.0418, radius: 900, zoom: 14.6,
+        pois: [
+          { name: 'Panagal Park', lng: 80.2337, lat: 13.0402 },
+          { name: 'Pondy Bazaar', lng: 80.2405, lat: 13.0425 },
+        ] },
+      { id: 'omr', name: 'OMR · Tidel Park', lng: 80.2496, lat: 12.9902, radius: 1000, zoom: 14.4,
+        pois: [
+          { name: 'Tidel Park', lng: 80.2496, lat: 12.9902 },
+          { name: 'Madhya Kailash Junction', lng: 80.2432, lat: 13.0063 },
+        ] },
+    ],
   },
 
   bengaluru: {
@@ -69,6 +101,8 @@ export const CITIES = {
     hint: 'zoom into Basaveshwar Nagar (z≥15) to enter the site',
     loadingSub: 'DIGITAL TWIN · BENGALURU · LUXURY RESIDENCES',
     macroView: { longitude: 77.62, latitude: 13.04, zoom: 10, pitch: 45, bearing: -12 },
+    roadNamesX: { '-150': 'Kamakshipalya Main Road', '-40': '8th Main Road', '110': 'West of Chord Road' },
+    roadNamesZ: { '-150': 'Modi Hospital Road', '-30': 'Siddaiah Puranik Road', '110': 'Magadi Main Road' },
     landmarks: {
       campus: 'KLE S. Nijalingappa College',
       complex: 'Havanur Complex · West of Chord Rd',
@@ -105,6 +139,29 @@ export const CITIES = {
         path: [[77.555, 13.01], [77.545, 12.995], [77.54, 12.98], [77.545, 12.96]] },
       { name: 'Old Airport Road', color: [255, 176, 64],
         path: [[77.62, 12.96], [77.65, 12.958], [77.7, 12.956]] },
+    ],
+    hotspots: [
+      { id: 'ubcity', name: 'UB City · Vittal Mallya Rd', lng: 77.5964, lat: 12.9718, radius: 800, zoom: 14.8,
+        pois: [
+          { name: 'UB City Mall', lng: 77.5964, lat: 12.9718 },
+          { name: 'Cubbon Park', lng: 77.5928, lat: 12.9763 },
+        ] },
+      { id: 'mgroad', name: 'MG Road · Trinity', lng: 77.6196, lat: 12.9737, radius: 900, zoom: 14.6,
+        pois: [
+          { name: 'MG Road Boulevard', lng: 77.6099, lat: 12.9747 },
+          { name: 'Trinity Circle', lng: 77.6206, lat: 12.9732 },
+        ] },
+      { id: 'rajajinagar', name: 'Rajajinagar · Orion / WTC', lng: 77.5551, lat: 13.0113, radius: 850, zoom: 14.7,
+        pois: [
+          { name: 'World Trade Center', lng: 77.5551, lat: 13.0116 },
+          { name: 'Orion Mall', lng: 77.554, lat: 13.0105 },
+          { name: 'Sheraton Grand', lng: 77.5547, lat: 13.01 },
+        ] },
+      { id: 'whitefield', name: 'Whitefield · ITPL', lng: 77.7364, lat: 12.9857, radius: 1100, zoom: 14.2,
+        pois: [
+          { name: 'ITPL Tech Park', lng: 77.7374, lat: 12.9866 },
+          { name: 'Phoenix Marketcity', lng: 77.6963, lat: 12.9959 },
+        ] },
     ],
   },
 }

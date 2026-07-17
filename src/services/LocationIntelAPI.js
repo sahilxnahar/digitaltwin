@@ -87,6 +87,27 @@ export async function fetchOpenLand() {
   return gj
 }
 
+// REAL road network around the site (live OpenStreetMap centerlines)
+export async function fetchOsmRoads() {
+  const q =
+    `[out:json][timeout:25];(` +
+    `way["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|service)$"](around:700,${PLACE_LAT},${PLACE_LNG});` +
+    `);out geom 800;`
+  const json = await overpassQuery(q)
+  const feats = []
+  for (const el of json.elements || []) {
+    if (!el.geometry || el.geometry.length < 2) continue
+    const tags = el.tags || {}
+    feats.push({
+      type: 'Feature',
+      properties: { kind: tags.highway || 'residential', name: tags.name || null },
+      geometry: { type: 'LineString', coordinates: el.geometry.map((p) => [p.lon, p.lat]) },
+    })
+  }
+  if (!feats.length) throw new Error('no OSM roads returned')
+  return { type: 'FeatureCollection', features: feats }
+}
+
 // Live OSM amenity snapshot within ~1.5 km of Ameya Heights
 export async function fetchAmenitySnapshot() {
   const q = `[out:json][timeout:20];(

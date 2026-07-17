@@ -91,7 +91,7 @@ export const CITIES = {
   bengaluru: {
     id: 'bengaluru',
     city: 'Bengaluru',
-    placeName: 'Ameya Heights',
+    placeName: 'Ameya 494',
     // SITE: 1st Block, 494, 15th Main Rd, 3rd Stage, Basaveshwar Nagar, 560079
     // ← for pinpoint accuracy: Google Maps → right-click your plot →
     //   click the coordinates to copy → paste them here (lat, lng)

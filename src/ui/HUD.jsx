@@ -9,6 +9,7 @@ import CitySwitcher from './CitySwitcher.jsx'
 import SearchBar from './SearchBar.jsx'
 import MapControls from './MapControls.jsx'
 import PropertyFilters from './PropertyFilters.jsx'
+import { useMapState, patchMapState } from '../mapStore.js'
 
 const SCENARIOS = [
   { id: 'normal', label: 'Normal' },
@@ -16,7 +17,7 @@ const SCENARIOS = [
   { id: 'construction', label: 'Construction' },
 ]
 
-const PROPOSED_ID = 'Ameya Heights'
+const PROPOSED_ID = PLACE_NAME
 const DEV_TELEMETRY = [
   ['typology', 'Semi-Commercial'],
   ['podium', '8m (Retail)'],
@@ -35,6 +36,7 @@ export default function HUD({
   envAuto, setEnvAuto, presenting,
 }) {
   const [showAerial, setShowAerial] = useState(false)
+  const mapSt = useMapState()
   const [showDiscovery, setShowDiscovery] = useState(false)
   const [showEnquiry, setShowEnquiry] = useState(false)
   const [travelTime, setTravelTime] = useState(false)
@@ -184,6 +186,9 @@ export default function HUD({
             <span className="sep" />
             <Btn on={showDev} onClick={toggleDev}>Proposed Site</Btn>
             <Btn on={tour} onClick={toggleTour}>Site Tour</Btn>
+            <Btn on={mapSt.siteMode === 'real'} onClick={() => patchMapState({ siteMode: mapSt.siteMode === 'real' ? 'stylized' : 'real' })}>
+              Real Site
+            </Btn>
           </>
         )}
       </div>

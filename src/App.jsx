@@ -6,7 +6,8 @@ import GeospatialMap from './scene/GeospatialMap.jsx'
 import EnvironmentController from './scene/Environment.jsx'
 import PresentationMode from './scene/PresentationMode.jsx'
 import { subscribePresentation, onSimEvent, emitSimEvent } from './state.js'
-import { getMapState, patchMapState, subscribeMapState } from './mapStore.js'
+import { getMapState, patchMapState, subscribeMapState, useMapState } from './mapStore.js'
+import { CITY_CFG } from './config.js'
 import Lighting from './scene/Lighting.jsx'
 import Ground from './scene/Ground.jsx'
 import Buildings from './scene/Buildings.jsx'
@@ -21,6 +22,7 @@ import Rain from './scene/Rain.jsx'
 import HUD from './ui/HUD.jsx'
 import NavigationControls from './ui/NavigationControls.jsx'
 import StreetLabels from './scene/StreetLabels.jsx'
+import RealSiteScene from './scene/RealSiteScene.jsx'
 import LoadingScreen from './ui/LoadingScreen.jsx'
 import { useLiveData } from './hooks/useLiveData.js'
 import { simState } from './state.js'
@@ -171,6 +173,19 @@ export default function App() {
   useEffect(() => subscribePresentation(setPresenting), [])
   const controlsRef = useRef()
   const data = useLiveData(liveEnabled)
+  const mapSt = useMapState()
+  const realSite = mapSt.siteMode === 'real'
+
+  // Entering Site View for a city other than the booted config requires a
+  // reload (the localized 3D scene derives from boot config); the branded
+  // loading screen covers the transition.
+  const requestViewMode = (v) => {
+    if (v === 'micro' && getMapState().cityId !== CITY_CFG.id) {
+      window.location.reload()
+      return
+    }
+    setViewMode(v)
+  }
 
   const [macroMounted, macroStyle] = useFadeLayer(viewMode === 'macro')
   const [microMounted, microStyle] = useFadeLayer(viewMode === 'micro')
@@ -192,12 +207,12 @@ export default function App() {
   return (
     <>
       <EnvironmentController enabled={envAuto} onModeChange={setMode} onSunChange={setSunPos} />
-      <PresentationMode active={presenting} setViewMode={setViewMode} />
+      <PresentationMode active={presenting} setViewMode={requestViewMode} />
 
       {/* ── MACRO: city-scale deck.gl map (Hebbal → Whitefield) ── */}
       {macroMounted && (
         <div className="layer" style={macroStyle}>
-          <GeospatialMap onEnterMicro={() => setViewMode('micro')} presenting={presenting} />
+          <GeospatialMap onEnterMicro={() => requestViewMode('micro')} presenting={presenting} />
         </div>
       )}
 
@@ -217,13 +232,19 @@ export default function App() {
             }}
           >
             <Lighting mode={mode} sunPos={sunPos} />
-            <Ground mode={mode} />
-            <Buildings mode={mode} onSelect={setSelected} />
-            <Trees />
-            <StreetLights mode={mode} />
-            <TrafficSignals />
-            <StreetLabels />
-            <Vehicles mode={mode} />
+            {realSite ? (
+              <RealSiteScene />
+            ) : (
+              <>
+                <Ground mode={mode} />
+                <Buildings mode={mode} onSelect={setSelected} />
+                <Trees />
+                <StreetLights mode={mode} />
+                <TrafficSignals />
+                <StreetLabels />
+                <Vehicles mode={mode} />
+              </>
+            )}
             {mode === 'rain' && <Rain />}
             <OrbitControls
               ref={controlsRef}
@@ -249,7 +270,7 @@ export default function App() {
       <HUD
         presenting={presenting}
         viewMode={viewMode}
-        setViewMode={setViewMode}
+        setViewMode={requestViewMode}
         data={data}
         mode={mode}
         setMode={forceMode}

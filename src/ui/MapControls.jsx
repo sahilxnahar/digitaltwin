@@ -1,10 +1,20 @@
 import { useState } from 'react'
-import { CITY_CFG } from '../config.js'
+import { CITIES } from '../cities.js'
 import { emitSimEvent } from '../state.js'
-import { useMapState, patchMapState, toggleOverlay } from '../mapStore.js'
+import { useMapState, patchMapState, toggleOverlay, togglePoi } from '../mapStore.js'
+import { POI_MIN_ZOOM } from '../services/PoiService.js'
 
 // Floating environmental & basemap control panel (City View).
 // Pure React overlay — never touches the Deck.gl canvas directly.
+
+const POI_FILTERS = [
+  { id: 'openland', label: 'Open Lands / Empty Plots' },
+  { id: 'construction', label: 'Construction Zones' },
+  { id: 'dining', label: 'Cafés & Restaurants' },
+  { id: 'hotels', label: 'Hotels' },
+  { id: 'luxury', label: '5-Star Hotels' },
+  { id: 'traffic', label: 'Live Traffic · TomTom' },
+]
 
 const OVERLAYS = [
   { id: 'aqi', label: 'Air Quality' },
@@ -14,12 +24,13 @@ const OVERLAYS = [
   { id: 'streetview', label: 'Street View · click map' },
   { id: 'osmBuildings', label: 'Real Buildings · OSM' },
   { id: 'openLand', label: 'Open Land Boundaries' },
+  { id: 'terrain3d', label: 'Terrain 3D · SRTM + Sentinel-2' },
 ]
 
 export default function MapControls() {
   const [open, setOpen] = useState(false)
   const ms = useMapState()
-  const hotspots = CITY_CFG.hotspots || []
+  const hotspots = (CITIES[ms.cityId] && CITIES[ms.cityId].hotspots) || []
 
   const pickHotspot = (h) => {
     const active = ms.hotspot && ms.hotspot.id === h.id
@@ -69,6 +80,18 @@ export default function MapControls() {
             <div className="dim small">Street View armed — click anywhere on the map to open the panorama</div>
           )}
 
+          <div className="dim small label">property intelligence</div>
+          <div className="map-row wrap">
+            {POI_FILTERS.map((o) => (
+              <button key={o.id} className={ms.poi[o.id] ? 'on' : ''} onClick={() => togglePoi(o.id)}>
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <div className="dim small">
+            POIs load for the current viewport only (zoom ≥ {POI_MIN_ZOOM}) — pan or zoom to refresh
+          </div>
+
           <div className="dim small label">top happening places</div>
           <div className="map-col">
             {hotspots.map((h) => (
@@ -76,6 +99,10 @@ export default function MapControls() {
                 {h.name}
               </button>
             ))}
+          </div>
+          <div className="dim small" style={{ marginTop: 6 }}>
+            data © OpenStreetMap contributors · Open Buildings (Google/Microsoft) ·
+            Sentinel-2 cloudless © EOX · SRTM
           </div>
         </div>
       )}

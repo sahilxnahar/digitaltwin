@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { ROAD_XS, ROAD_ZS, WORLD } from '../paths.js'
 import { simState } from '../state.js'
-import { CITY, CITY_CFG } from '../config.js'
+import { CITY, CITY_CFG, PLACE_NAME } from '../config.js'
 import { getMapState } from '../mapStore.js'
 import { AmeyaHeightsSite } from './AmeyaHeightsModel.jsx'
 
@@ -341,13 +341,13 @@ export default function Buildings({ mode, onSelect }) {
       {/* ── Ameya Heights — semi-commercial development (A/B toggle) ── */}
       {showDev && (
         <group
-          onClick={(e) => { e.stopPropagation(); onSelect('Ameya Heights') }}
+          onClick={(e) => { e.stopPropagation(); onSelect(PLACE_NAME) }}
           onPointerOver={hover(true)}
           onPointerOut={hover(false)}
         >
           <AmeyaHeightsSite position={[PLOT.x, 0, PLOT.z]} />
           <SignBoard
-            title="AMEYA HEIGHTS"
+            title={PLACE_NAME.toUpperCase()}
             sub={`Premium Residences · ${CITY}`}
             position={[PLOT.x, 0, PLOT.z - 24]}
             width={12}

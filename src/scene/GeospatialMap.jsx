@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import DeckGL from '@deck.gl/react'
-import { FlyToInterpolator, PathLayer, ScatterplotLayer, TextLayer, GeoJsonLayer, Tile3DLayer, TileLayer, BitmapLayer, TripsLayer } from 'deck.gl'
+import { FlyToInterpolator, PathLayer, ScatterplotLayer, TextLayer, GeoJsonLayer, Tile3DLayer, TileLayer, BitmapLayer, TerrainLayer, TripsLayer, ScenegraphLayer, ColumnLayer } from 'deck.gl'
 import { Map as MapLibreMap } from 'react-map-gl/maplibre'
 import { Map as MapboxMap } from 'react-map-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
@@ -9,6 +9,8 @@ import { CITY_CFG, PLACE_LAT, PLACE_LNG, PLACE_NAME } from '../config.js'
 import { onSimEvent, emitSimEvent, simState } from '../state.js'
 import { fetchIsochrones } from '../services/LocationIntelAPI.js'
 import { getMapState, subscribeMapState } from '../mapStore.js'
+import { CITIES } from '../cities.js'
+import { fetchPoiCategory, clearPoiCache, POI_MIN_ZOOM } from '../services/PoiService.js'
 import { fetchOsmBuildings, fetchOpenLand } from '../services/LocationIntelAPI.js'
 
 // ─── Google Maps Photorealistic 3D Tiles ───
@@ -55,8 +57,8 @@ function rasterOverlay(id, url) {
     id: `overlay-${id}`,
     data: url,
     tileSize: 256,
-    maxZoom: OVERLAY_MAXZOOM[id],
-    opacity: OVERLAY_OPACITY[id],
+    maxZoom: OVERLAY_MAXZOOM[id] || 18,
+    opacity: OVERLAY_OPACITY[id] || 0.85,
     onTileError: () => {}, // a missing tile must never break the scene
     renderSubLayers: (props) => {
       const bb = props.tile.boundingBox
@@ -89,8 +91,24 @@ const INITIAL_VIEW_STATE = {
 // site hands off to the high-fidelity three.js micro sim
 const MICRO_TRIGGER = { zoom: 15, dLat: 0.02, dLng: 0.03 }
 
-// Simplified stylized arterial centerlines for the active city
-const ARTERIALS = CITY_CFG.arterials
+// Arterial centerlines for BOTH cities — the 3D tile stream is global,
+// so the deck instance renders whichever city the camera flies to
+const ARTERIALS = [...CITIES.chennai.arterials, ...CITIES.bengaluru.arterials]
+
+// Property injection sites (one per city, distinct branding)
+const SITES = Object.values(CITIES).map((c) => ({
+  id: c.id,
+  name: c.placeName,
+  lng: c.lng,
+  lat: c.lat,
+  model: `${import.meta.env.BASE_URL}${c.model}`,
+}))
+const TOMTOM_KEY = import.meta.env.VITE_TOMTOM_KEY || ''
+const POI_STYLE = {
+  dining: [232, 162, 74],
+  hotels: [180, 140, 232],
+  luxury: [230, 215, 178],
+}
 
 // Synthetic timestamps proportional to path length → looping animated trips
 const LOOP = 600
@@ -110,6 +128,50 @@ export default function GeospatialMap({ onEnterMicro, presenting = false }) {
   const lastView = useRef(INITIAL_VIEW_STATE) // latest camera pose (uncontrolled)
   const ms = getMapState() // fresh every frame (component re-renders on the time tick)
   const lastZoomRef = useRef(99) // 99 → must zoom OUT below the threshold before auto-trigger can arm
+  const [poiData, setPoiData] = useState({})
+  const [modelOk, setModelOk] = useState({})
+  const poiTimer = useRef(null)
+  const lastCityRef = useRef(getMapState().cityId)
+
+  // preflight the .glb site models once (missing file → champagne column fallback)
+  useEffect(() => {
+    SITES.forEach((s) => {
+      fetch(s.model, { method: 'HEAD' })
+        .then((r) => {
+          const ct = r.headers.get('content-type') || ''
+          if (r.ok && !ct.includes('text/html')) setModelOk((m) => ({ ...m, [s.id]: true }))
+        })
+        .catch(() => {})
+    })
+  }, [])
+
+  // viewport-restricted POI refresh: debounced after the camera settles,
+  // bounded by zoom-scaled radius (see PoiService anti-crash rules)
+  const refreshPois = () => {
+    const s = getMapState()
+    const vs = lastView.current
+    const active = Object.keys(s.poi).filter((k) => s.poi[k] && k !== 'traffic')
+    if (!active.length || vs.zoom < POI_MIN_ZOOM) return
+    const center = { lat: vs.latitude, lng: vs.longitude }
+    active.forEach((cat) =>
+      fetchPoiCategory(cat, center, vs.zoom).then((d) => d && setPoiData((p) => ({ ...p, [cat]: d })))
+    )
+  }
+  useEffect(
+    () =>
+      subscribeMapState(() => {
+        const s = getMapState()
+        if (s.cityId !== lastCityRef.current) {
+          // heavy context switch: drop caches + stale markers, tiles restream
+          lastCityRef.current = s.cityId
+          clearPoiCache()
+          setPoiData({})
+        }
+        refreshPois()
+      }),
+    []
+  )
+
   const [osmBuildings, setOsmBuildings] = useState(null)
   const [openLand, setOpenLand] = useState(null)
   const fetching = useRef({})
@@ -134,7 +196,7 @@ export default function GeospatialMap({ onEnterMicro, presenting = false }) {
       }),
     []
   )
-  const tilesActive = HAS_GOOGLE_KEY && ms.show3dTiles && ms.basemap === 'default'
+  const tilesActive = HAS_GOOGLE_KEY && ms.show3dTiles && ms.basemap === 'default' && !ms.overlays.terrain3d
   const [isoData, setIsoData] = useState(null)
   const [showIso, setShowIso] = useState(false)
 
@@ -233,13 +295,16 @@ export default function GeospatialMap({ onEnterMicro, presenting = false }) {
       // zooming back out always works.
       const crossed = lastZoomRef.current < MICRO_TRIGGER.zoom && vs.zoom >= MICRO_TRIGGER.zoom
       lastZoomRef.current = vs.zoom
+      const site = CITIES[getMapState().cityId] || CITIES.bengaluru
       if (
         crossed &&
-        Math.abs(vs.latitude - PLACE_LAT) < MICRO_TRIGGER.dLat &&
-        Math.abs(vs.longitude - PLACE_LNG) < MICRO_TRIGGER.dLng
+        Math.abs(vs.latitude - site.lat) < MICRO_TRIGGER.dLat &&
+        Math.abs(vs.longitude - site.lng) < MICRO_TRIGGER.dLng
       ) {
         onEnterMicro()
       }
+      if (poiTimer.current) clearTimeout(poiTimer.current)
+      poiTimer.current = setTimeout(refreshPois, 800)
     },
     [onEnterMicro]
   )
@@ -260,6 +325,17 @@ export default function GeospatialMap({ onEnterMicro, presenting = false }) {
         .map((k) => {
           const url = OVERLAY_TILES[k]()
           return url ? rasterOverlay(k, url) : null
+        }),
+      // SRTM terrain (MapTiler terrain-RGB) draped with Sentinel-2 cloudless
+      ms.overlays.terrain3d && HAS_MAPTILER_KEY &&
+        new TerrainLayer({
+          id: 'terrain-3d',
+          minZoom: 0,
+          maxZoom: 12,
+          elevationDecoder: { rScaler: 6553.6, gScaler: 25.6, bScaler: 0.1, offset: -10000 },
+          elevationData: `https://api.maptiler.com/tiles/terrain-rgb-v2/{z}/{x}/{y}.webp?key=${MAPTILER_KEY}`,
+          texture: 'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg',
+          operation: 'terrain+draw',
         }),
       // REAL OSM building footprints (live data), extruded in 3D
       ms.overlays.osmBuildings && osmBuildings &&
@@ -380,34 +456,117 @@ export default function GeospatialMap({ onEnterMicro, presenting = false }) {
         getBackgroundColor: [8, 10, 14, 165],
         backgroundPadding: [4, 2],
       }),
-      // pulsing beacon over the micro-sim site
+      // ── DUAL-CITY PROPERTY INJECTION ──
+      // pulsing beacons over both sites (active city pulses brighter)
       new ScatterplotLayer({
         id: 'site-pulse',
-        data: [{ position: [PLACE_LNG, PLACE_LAT] }],
-        getPosition: (d) => d.position,
-        getFillColor: [90, 214, 125, 70],
-        getLineColor: [90, 214, 125, 220],
+        data: SITES,
+        getPosition: (d) => [d.lng, d.lat],
+        getFillColor: (d) => (d.id === ms.cityId ? [90, 214, 125, 70] : [230, 215, 178, 40]),
+        getLineColor: (d) => (d.id === ms.cityId ? [90, 214, 125, 220] : [230, 215, 178, 160]),
         stroked: true,
         lineWidthMinPixels: 2,
         radiusUnits: 'meters',
-        getRadius: 420 + 160 * Math.sin(time * 0.08),
-        updateTriggers: { getRadius: time },
+        getRadius: (d) => (d.id === ms.cityId ? 420 + 160 * Math.sin(time * 0.08) : 420),
+        updateTriggers: { getRadius: time, getFillColor: ms.cityId, getLineColor: ms.cityId },
       }),
+      // high-fidelity .glb architectural models at exact coordinates
+      ...SITES.filter((s) => modelOk[s.id]).map(
+        (s) =>
+          new ScenegraphLayer({
+            id: `site-glb-${s.id}`,
+            data: [s],
+            scenegraph: s.model,
+            getPosition: (d) => [d.lng, d.lat],
+            getOrientation: [0, 0, 90],
+            sizeScale: 1,
+            _lighting: 'pbr',
+          })
+      ),
+      // champagne massing column where a .glb hasn't been provided yet
+      ...SITES.filter((s) => !modelOk[s.id]).map(
+        (s) =>
+          new ColumnLayer({
+            id: `site-column-${s.id}`,
+            data: [s],
+            getPosition: (d) => [d.lng, d.lat],
+            radius: 26,
+            extruded: true,
+            getElevation: 56,
+            getFillColor: [230, 215, 178, 235],
+            getLineColor: [8, 10, 14, 255],
+          })
+      ),
       new TextLayer({
-        id: 'site-label',
-        data: [{ position: [PLACE_LNG, PLACE_LAT], text: `${PLACE_NAME.toUpperCase()} ▸ ZOOM TO ENTER SITE` }],
-        getPosition: (d) => d.position,
-        getText: (d) => d.text,
+        id: 'site-labels',
+        data: SITES,
+        getPosition: (d) => [d.lng, d.lat],
+        getText: (d) => (d.id === ms.cityId ? `${d.name.toUpperCase()} ▸ ZOOM TO ENTER SITE` : d.name.toUpperCase()),
         getSize: 13,
-        getColor: [159, 232, 184, 255],
+        getColor: (d) => (d.id === ms.cityId ? [159, 232, 184, 255] : [230, 215, 178, 235]),
         getPixelOffset: [0, -28],
         fontFamily: 'Menlo, Consolas, monospace',
         background: true,
         getBackgroundColor: [8, 10, 14, 210],
         backgroundPadding: [6, 3],
+        updateTriggers: { getText: ms.cityId, getColor: ms.cityId },
       }),
+      // ── SEMANTIC POI FILTERS (viewport-restricted, clustered by cap) ──
+      ms.poi.traffic && TOMTOM_KEY &&
+        rasterOverlay('traffic', `https://api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?key=${TOMTOM_KEY}`),
+      ms.poi.openland && poiData.openland && poiData.openland.geojson &&
+        new GeoJsonLayer({
+          id: 'poi-openland',
+          data: poiData.openland.geojson,
+          stroked: true,
+          filled: true,
+          getFillColor: [90, 214, 125, 22],
+          getLineColor: [90, 214, 125, 220],
+          lineWidthMinPixels: 2,
+        }),
+      ms.poi.construction && poiData.construction && poiData.construction.geojson &&
+        new GeoJsonLayer({
+          id: 'poi-construction',
+          data: poiData.construction.geojson,
+          stroked: true,
+          filled: true,
+          getFillColor: [232, 140, 60, 45],
+          getLineColor: [232, 140, 60, 230],
+          lineWidthMinPixels: 2,
+        }),
+      ...['dining', 'hotels', 'luxury']
+        .filter((cat) => ms.poi[cat] && poiData[cat] && poiData[cat].points)
+        .flatMap((cat) => [
+          new ScatterplotLayer({
+            id: `poi-${cat}`,
+            data: poiData[cat].points,
+            getPosition: (d) => [d.lng, d.lat],
+            radiusUnits: 'meters',
+            getRadius: cat === 'luxury' ? 46 : 30,
+            radiusMinPixels: 4,
+            getFillColor: [...POI_STYLE[cat], 230],
+            stroked: true,
+            getLineColor: [8, 10, 14, 220],
+            lineWidthMinPixels: 1.5,
+          }),
+          lastView.current.zoom >= 14 &&
+            new TextLayer({
+              id: `poi-${cat}-labels`,
+              data: poiData[cat].points.slice(0, 24),
+              getPosition: (d) => [d.lng, d.lat],
+              getText: (d) => d.name,
+              getSize: 11,
+              getColor: [...POI_STYLE[cat], 255],
+              getPixelOffset: [0, -14],
+              fontFamily: 'Georgia, serif',
+              background: true,
+              getBackgroundColor: [8, 10, 14, 185],
+              backgroundPadding: [4, 2],
+              maxWidth: 16,
+            }),
+        ]),
     ],
-    [time, isoData, showIso, osmBuildings, openLand]
+    [time, isoData, showIso, osmBuildings, openLand, poiData, modelOk]
   )
 
   const handleMapClick = (info) => {

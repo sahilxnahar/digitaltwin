@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import * as THREE from 'three'
 import { onSimEvent } from '../state.js'
-import { CITY_CFG } from '../config.js'
+import { CITY_CFG, PLACE_NAME } from '../config.js'
 
 // Full-screen premium loading overlay. Fades out once initial assets are in:
 // hooked to the three.js DefaultLoadingManager AND the Google 3D Tiles
@@ -61,7 +61,7 @@ export default function LoadingScreen() {
 
   return (
     <div className={fading ? 'loading-screen out' : 'loading-screen'}>
-      <div className="loading-title">AMEYA HEIGHTS</div>
+      <div className="loading-title">{PLACE_NAME.toUpperCase()}</div>
       <div className="loading-sub">{CITY_CFG.loadingSub}</div>
       <div className="loading-ring" />
       <div className="loading-bar">

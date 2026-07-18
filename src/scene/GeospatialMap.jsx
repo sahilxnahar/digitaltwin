@@ -12,6 +12,7 @@ import { getMapState, subscribeMapState } from '../mapStore.js'
 import { CITIES } from '../cities.js'
 import { fetchPoiCategory, clearPoiCache, POI_MIN_ZOOM } from '../services/PoiService.js'
 import { fetchOsmBuildings, fetchOpenLand } from '../services/LocationIntelAPI.js'
+import { getVidaTile, estimateHeight } from '../services/VidaBuildings.js'
 
 // ─── Google Maps Photorealistic 3D Tiles ───
 // Requires "Map Tiles API" enabled on the key. While no key is present the
@@ -257,7 +258,7 @@ export default function GeospatialMap({ onEnterMicro, presenting = false }) {
       }),
     []
   )
-  const tilesActive = HAS_GOOGLE_KEY && ms.show3dTiles && ms.basemap === 'default' && !ms.overlays.terrain3d
+  const tilesActive = HAS_GOOGLE_KEY && ms.show3dTiles && ms.basemap === 'default' && !ms.overlays.terrain3d && !ms.overlays.vidaBuildings
   const [isoData, setIsoData] = useState(null)
   const [showIso, setShowIso] = useState(false)
 
@@ -391,6 +392,29 @@ export default function GeospatialMap({ onEnterMicro, presenting = false }) {
         .map((k) => {
           const url = OVERLAY_TILES[k]()
           return url ? rasterOverlay(k, url) : null
+        }),
+      // CITY-WIDE REAL FOOTPRINTS — VIDA Open Buildings streamed via
+      // PMTiles range requests; extruded with area-based height heuristic
+      ms.overlays.vidaBuildings &&
+        new TileLayer({
+          id: 'vida-buildings',
+          minZoom: 12,
+          maxZoom: 14,
+          tileSize: 512,
+          maxRequests: 8,
+          getTileData: getVidaTile,
+          renderSubLayers: (props) =>
+            new GeoJsonLayer({
+              ...props,
+              id: `${props.id}-gj`,
+              data: props.data || [],
+              extruded: true,
+              getElevation: estimateHeight,
+              getFillColor: [201, 195, 180, 240],
+              getLineColor: [40, 44, 52, 255],
+              stroked: false,
+              pickable: false,
+            }),
         }),
       // SRTM terrain (MapTiler terrain-RGB) draped with Sentinel-2 cloudless
       ms.overlays.terrain3d && HAS_MAPTILER_KEY &&

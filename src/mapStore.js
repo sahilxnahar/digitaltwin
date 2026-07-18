@@ -8,7 +8,7 @@ const state = {
   timeOfDay: 'day', // default bright — 'day' | 'night' (synced with Site View)
   basemap: 'default', // 'default' | 'satellite' | 'terrain'
   show3dTiles: true, // Google photorealistic tiles on/off
-  overlays: { aqi: false, transit: false, cycling: false, fire: false, streetview: false, osmBuildings: false, openLand: false, terrain3d: false },
+  overlays: { aqi: false, transit: false, cycling: false, fire: false, streetview: false, osmBuildings: false, openLand: false, terrain3d: false, vidaBuildings: false },
   siteMode: 'stylized', // Site View geometry: 'stylized' | 'real' (live OSM)
   cityId: getActiveCityId(), // ACTIVE city for the streaming macro view (soft-switched)
   poi: { openland: false, construction: false, dining: false, hotels: false, luxury: false, traffic: false },

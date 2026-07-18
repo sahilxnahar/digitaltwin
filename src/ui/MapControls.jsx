@@ -25,6 +25,7 @@ const OVERLAYS = [
   { id: 'osmBuildings', label: 'Real Buildings · OSM' },
   { id: 'openLand', label: 'Open Land Boundaries' },
   { id: 'terrain3d', label: 'Terrain 3D · SRTM + Sentinel-2' },
+  { id: 'vidaBuildings', label: 'City Buildings · VIDA (streamed)' },
 ]
 
 export default function MapControls() {
